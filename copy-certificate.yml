@@ -1,0 +1,162 @@
+# ------------------------------------------------------------------------------
+# copy-certificate.yml
+# ------------------------------------------------------------------------------
+
+- hosts: wordpress
+
+  vars_prompt:
+
+    - name: subdomain
+      prompt: What is the subdomain; for example "dev", "test", "www" etc.?
+      private: false
+
+  tasks:
+
+    - name: Make a fact of the subdomain for subsequent plays
+      ansible.builtin.set_fact:
+        subdomain: "{{ subdomain }}"
+
+# If we are copying a certificate to a target host then it could be coming from
+# any of the WordPress hosts other than that target host, so this is what the
+# next play targets.
+
+- hosts: wordpress:!{{ target_host }}
+
+  tasks:
+
+    - block:
+
+        - name: Find recent privkey files in the archive for our FQDN
+          # We separate the privkey files from the cert, chain and fullchain
+          # files so that we can apply a separate chmod to them after copying.
+          ansible.builtin.find:
+            paths:
+              - /etc/letsencrypt/archive/{{ subdomain }}.{{ domain_name }}
+            patterns: [ '^privkey\d+\.pem$' ]
+            use_regex: yes
+            age: -30w # Exclude older files in the archive.
+          register: privkey_find_result
+
+        - name: >-
+            Find recent cert, chain and fullchain files in the archive for our
+            FQDN
+          # We separate the privkey files from the cert, chain and fullchain
+          # files so that we can apply a separate chmod to them after copying.
+          ansible.builtin.find:
+            paths:
+              - /etc/letsencrypt/archive/{{ subdomain }}.{{ domain_name }}
+            patterns:
+              - '^cert\d+\.pem$'
+              - '^chain\d+\.pem$'
+              - '^fullchain\d+\.pem$'
+            use_regex: yes
+            age: -30w # Exclude older files in the archive.
+          register: other_find_result
+
+        - block:
+
+            - name: >-
+                Notify the controller and the target host of the host that the
+                certificates were found on
+              ansible.builtin.set_fact:
+                source_host: "{{ inventory_hostname }}"
+              delegate_to: "{{ item }}"
+              delegate_facts: True
+              loop: [ localhost, "{{ target_host }}" ]
+
+            - name: Notify the target host of the list of privkey files copied
+              ansible.builtin.set_fact:
+                privkey_find_result: "{{ privkey_find_result }}"
+              delegate_to: "{{ target_host }}"
+              delegate_facts: True
+
+            - name: >-
+                Determine what the targets of the links in the live directory
+                are
+              ansible.builtin.stat:
+                path: "\
+                  /etc/letsencrypt/live/{{ subdomain }}.{{ domain_name }}/\
+                  {{ item }}.pem"
+              loop: [ cert, chain, fullchain, privkey ]
+              register: stat_result
+
+            - name: >-
+                Notify the target host of what the targets of the links in the
+                live directory are
+              ansible.builtin.set_fact:
+                stat_results: "{{ stat_result.results }}"
+              delegate_to: "{{ target_host }}"
+              delegate_facts: True
+
+            - name: >-
+                Fetch the files from the archive and renewal directories to copy
+                over
+              ansible.builtin.fetch:
+                src: "{{ item }}"
+                dest: /tmp
+              loop: >-
+                {{
+                  privkey_find_result.files | map(attribute='path') +
+                  other_find_result.files | map(attribute='path') +
+                  [
+                    "/etc/letsencrypt/renewal/" + subdomain + '.' +
+                    domain_name + '.conf'
+                  ]
+                }}
+
+          when: (privkey_find_result.matched + other_find_result.matched) > 0
+
+      become: yes
+
+- hosts: "{{ target_host }}"
+
+  tasks:
+
+    - block:
+
+        - name: Copy the archive files for our chosen FQDN to the target host
+          ansible.builtin.copy:
+            src: "\
+              /tmp/{{ source_host }}/etc/letsencrypt/archive/{{ subdomain }}.\
+              {{ domain_name }}"
+            dest: /etc/letsencrypt/archive/
+
+        - name: Set more restrictive permissions for privkey files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            mode: u=rw,g=,o=
+          loop: "{{ privkey_find_result.files | map(attribute='path') }}"
+
+        - name: Copy the renewal file for our chosen FQDN to the target host
+          ansible.builtin.copy:
+            src: "\
+              /tmp/{{ source_host }}/etc/letsencrypt/renewal/{{ subdomain }}.\
+              {{ domain_name }}.conf"
+            dest: /etc/letsencrypt/renewal/
+
+        - name: Create the FQDN directory to hold the live links
+          ansible.builtin.file:
+            path: /etc/letsencrypt/live/{{ subdomain }}.{{ domain_name }}
+            state: directory
+
+        - name: Create the required links in the live directory
+          ansible.builtin.file:
+            path: "\
+              /etc/letsencrypt/live/{{ subdomain }}.{{ domain_name }}\
+              /{{ stat_result.item }}.pem"
+            src: "{{ stat_result.stat.lnk_source }}"
+            state: link
+          loop: "{{ stat_results }}"
+          loop_control:
+            loop_var: stat_result
+
+      become: yes
+
+- hosts: localhost
+
+  tasks:
+
+    - name: Remove the files that we fetched to the controller
+      ansible.builtin.file:
+        path: /tmp/{{ source_host }}
+        state: absent
