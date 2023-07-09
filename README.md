@@ -8,7 +8,7 @@ A library of Ansible playbooks that is used as a Git submodule across multiple p
 
 1. We use our [Services - Ansible](https://github.com/varilink/services-ansible) repository to manage the core services across our server estate. This uses our main hosts inventory. We simulate that host inventory in the *now* and *to-be* test environments within our [Services - Docker](https://github.com/varilink/services-docker) repository.
 
->>Since playbooks are essentially a mapping between hosts and roles, the same playbooks are used in those two repositories, indeed this is fundamental to the value of testing in the [Services - Docker](https://github.com/varilink/services-docker) repository.
+    Since playbooks are essentially a mapping between hosts and roles, the same playbooks are used in those two repositories, indeed this is fundamental to the value of testing in the [Services - Docker](https://github.com/varilink/services-docker) repository.
 
 2. Many of the playbooks in this repository are used in multiple, website projects. Each of those website projects provides project specific Ansible variables via `group_vars/` and `host_vars` directories, which are used by the common, website project specific playbooks in this repository.
 
@@ -17,6 +17,7 @@ A library of Ansible playbooks that is used as a Git submodule across multiple p
 | Playbook               | Type    |
 | ---------------------- | ------- |
 | `copy-certificate.yml` | project |
+| `copy-subdomain.yml`   | project |
 
 ## Usage
 
@@ -56,3 +57,32 @@ The `domain_name` should be configured within the project's Ansible variable fil
 ```sh
 ansible-playbook --extra-vars target_host=prod4 --extra-vars subdomain=www --limit=prod3,prod4,localhost ./playbooks/copy-certificate.yml
 ```
+
+### copy-subdomain.yml
+
+This playbook makes a copy of a WordPress site to another subdomain for the same domain and on the same host; for example makes a copy of `preprod.varilink.co.uk` to `www.varilink.co.uk` on the same host. By *copy* we mean that the new WordPress site will be identical, except that the change in subdomain will be reflected in both its database and its `wp-config.php` file.
+
+The example given above reflects a common usage scenario for this playbook; for example as follows:
+
+1. `www.varilink.co.uk` is hosted on `prod3` and we want to move it to `prod4`.
+
+2. We create `preprod.varilink.co.uk` on `prod4` and develop and test it until we are confident that it's ready to replace the existing `www.varilink.co.uk`.
+
+3. We copy `preprod.varilink.co.uk` on `prod4` to `www.varilink.co.uk`, also on `prod4`, ahead of making the DNS change to make it the new, live `www.varilink.co.uk`.
+
+To run this playbook; for example:
+
+```sh
+ansible-playbook --limit=prod4 ./playbooks/copy-subdomain.yml
+```
+
+Note that since this playbook works on one host only, you should use `--limit` as above to target the relevant, specific host.
+
+The playbook will prompt for three variables:
+- `current_subdomain`; for example `preprod`
+- `to_be_subdomain`; for example `www`
+- `to_be_port`; for example `8084`
+
+The value for `to_be_port` should be a port that is not already used on the host, which can be determined by examination of `/etc/apache2/ports.conf` on that host.
+
+Of course, these variables can also be set using `--extra-vars` on the command line.

@@ -1,0 +1,164 @@
+# ------------------------------------------------------------------------------
+# copy-subdomain.yml
+# ------------------------------------------------------------------------------
+
+---
+
+- hosts: wordpress
+
+  vars_prompt:
+
+    - name: current_subdomain
+      prompt: |-
+        What is the current subdomain; for example "dev", "test", "www" etc.?
+      private: false
+
+    - name: to_be_subdomain
+      prompt: |-
+        What is the to-be subdomain; for example "dev", "test", "www" etc.?
+      private: false
+
+    - name: to_be_port
+      # See the comments in the task "Override the configured current port with
+      # the new to-be port" below.
+      prompt: What port should I allocate for the to-be subdomain?
+      private: false
+
+  tasks:
+  
+    - name: Get site vars based on the current subdomain
+      # It will be the current subdomain that is configured via the project's
+      # Ansible variables.  
+      ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: get-site-vars
+      vars:
+        subdomain: "{{ current_subdomain }}"
+
+    - name: Import the tasks to dump a WordPress site database
+      ansible.builtin.import_role:
+        name: database
+        tasks_from: dump-site
+        handlers_from: none
+
+    - name: >-
+        Change the WordPress site server name and database name to correspond to
+        the subdomain that we are copying to
+      ansible.builtin.set_fact:
+        wordpress_site_server_name: "{{ to_be_subdomain }}.{{ domain_name }}"
+        wordpress_site_database_name: "\
+          {{ wordpress_site_server_name | regex_replace ('\\.', '_') }}"
+
+    - name: Import tasks to import the dump file to the new subdomain's database
+      # This uses the dump file that was generated in the previous task "Import
+      # the tasks to dump a WordPress site database"
+      ansible.builtin.import_role:
+        name: database
+        tasks_from: import-site
+        handlers_from: none
+
+    - name: Import the tasks to create a WordPress site's database
+      # The new subdomain's database already exists but this will have the
+      # effect of creating the corresponding WordPress database user.
+      ansible.builtin.import_role:
+        name: database
+        tasks_from: create-site
+        handlers_from: none
+
+    - block:
+
+        - name: Create the top-level WordPress directory for the new subdomain
+          ansible.builtin.file:
+            path: "/var/www/{{ wordpress_site_server_name }}"
+            state: directory
+
+        - name: >-
+            Remove the html directory for the to-be subdomain so that we replace
+            all of its content in the subsequent copy task
+          ansible.builtin.file:
+            path: "/var/www/{{ wordpress_site_server_name }}/html"
+            state: absent
+
+        - name: >-
+            Copy the WordPress files from the current subdomain to the new
+            subdomain
+          ansible.builtin.copy:
+            src: "{{ wordpress_site_path }}"
+            remote_src: true
+            dest: "/var/www/{{ wordpress_site_server_name }}"
+
+        - name: >-
+            Remove the wp-config.php file so that it will be recreated when we
+            import WordPress create site tasks
+          ansible.builtin.file:
+            path: "/var/www/{{ wordpress_site_server_name }}/html/wp-config.php"
+            state: absent
+
+      become: yes
+
+    - name: Change the WordPress site path to that of the new subdomain
+      ansible.builtin.set_fact:
+        wordpress_site_path: "/var/www/{{ wordpress_site_server_name }}/html"
+
+    - name: Set WordPress site plugin and theme facts to empty
+      # The site vars that we got in the task "Get site vars based on the
+      # current subdomain" above may have included configuration for site themes
+      # and plugins. We don't want to redeploy these when we import the
+      # WordPress tasks to create a site in the next task, since we've just
+      # copied over all the WordPress files. The easiest way to prevent this is
+      # simply to empty the facts that may contain that configuration.
+      ansible.builtin.set_fact:
+        wordpress_site_plugins: []
+        wordpress_site_themes: []
+
+    - name: Import the WordPress tasks to create a site
+      # We've already partially created the site for the new subdomain by
+      # copying from the site for the current subdomain. Importing these tasks
+      # will complete the job.
+      ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: create-site.yml
+
+    - name: >-
+        Do a WordPress search and replace from the current subdomain to the
+        to-be subdomain
+      ansible.builtin.command: >-
+        wp --path={{ wordpress_site_path }} search-replace
+        {{ current_subdomain }}.{{ domain_name }}
+        {{ wordpress_site_server_name }}
+      become: yes
+      become_user: www-data
+
+    - name: Override the configured current port with the new to-be port
+      # This is the port that Apache will listen on for this site and therefore
+      # that Nginx will use as its proxy pass port for the site. Examine
+      # /etc/apache2/ports.conf and select a port that's not already in use.
+      ansible.builtin.set_fact:
+        wordpress_site_subdomain: "{{ to_be_subdomain }}"
+        wordpress_site_reverse_proxy_pass_port: "{{ to_be_port }}"
+
+    - name: Include the required handlers from the wordpress_apache role
+      ansible.builtin.include_role:
+        name: wordpress_apache
+        tasks_from: none
+        handlers_from: "{{ handlers_from }}"    
+
+    - name: Import the tasks to create the site from the wordpress_apache role
+      # Note that included the required handlers with in the previous task and
+      # imported the required tasks in this task so that we could use
+      # --start-at-task for this imported task list if we wanted to.
+      ansible.builtin.import_role:
+        name: wordpress_apache
+        tasks_from: create-site-apache
+        handlers_from: none
+
+    - name: Include the required Nginx handlers
+      ansible.builtin.include_role:
+        name: nginx
+        tasks_from: none
+        handlers_from: service
+    
+    - name: Import the tasks to create the site from the reverse_proxy role
+      ansible.builtin.import_role:
+        name: reverse_proxy
+        tasks_from: create-site-body
