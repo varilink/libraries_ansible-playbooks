@@ -1,0 +1,6 @@
+# When this repository is added as a submodule of project Ansible repositories,
+# we create symbolic links to the /group_vars and /host_vars directories of
+# those project repositories in this repository, so that playbooks can find the
+# project's variables. Hence we must ignore those symbolic links here.
+/group_vars
+/host_vars
