@@ -1,0 +1,153 @@
+# ------------------------------------------------------------------------------
+# create-services.yml
+# ------------------------------------------------------------------------------
+
+# ------
+# Backup
+# ------
+
+- hosts: all
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: backup_client
+      tags: backup
+
+- hosts: hub
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: database
+
+        - ansible.builtin.import_role:
+            name: database
+            tasks_from: create-backup-database
+
+        - ansible.builtin.import_role:
+            name: backup_director
+
+        - ansible.builtin.import_role:
+            name: backup_storage
+
+      tags: backup
+
+- hosts: home
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: backup_web
+
+        - block:
+
+            - ansible.builtin.import_role:
+                name: database
+                tasks_from: create-backup-database
+              vars:
+                database_user_host: "{{ ansible_hostname }}"
+
+            - ansible.builtin.import_role:
+                name: dns
+                tasks_from: create-project-record
+              vars:
+                dns_record_hostname: backup.{{ home_domain }}
+
+          delegate_to: hub
+
+      tags: backup
+
+# ---
+# DNS
+# ---
+
+- hosts: hub
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+      tags: dns
+
+# -------
+# Monitor
+# -------
+
+- hosts: home
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: monitor_server
+
+        - ansible.builtin.import_role:
+            name: monitor_dashboard
+
+      tags: monitor
+
+- hosts: gateway
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: monitor_gateway
+      tags: monitor
+      vars:
+        env_uses_ca: no
+
+    - ansible.builtin.import_role:
+        name: dynamic_dns
+        tasks_from: copy-project-records
+      tags: monitor
+
+- hosts: all
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: monitor_server
+            tasks_from: get-all-access-token
+          delegate_to: home
+
+        - ansible.builtin.import_role:
+            name: monitor_client
+      
+      tags: monitor
+
+# ---
+# Web
+# ---
+
+- hosts: dev,prod2
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: wordpress_nginx
+      tags: web
+
+- hosts: dev,gateway,prod4
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: database
+
+        - ansible.builtin.import_role:
+            name: wordpress_apache
+
+        - ansible.builtin.import_role:
+            name: reverse_proxy
+
+      tags: web
