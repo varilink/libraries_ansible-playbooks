@@ -1,0 +1,17 @@
+- hosts: gateway,prod4
+
+  vars_prompt:
+
+    - name: subdomain
+      prompt: What subdomain do you want me run a WP CLI script against?
+      private: no
+
+    - name: script
+      prompt: What WPI CLI script do you want me to run?
+      private: no
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: wp-cli-script
