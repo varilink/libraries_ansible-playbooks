@@ -1,4 +1,4 @@
-- hosts: gateway,prod4
+- hosts: wordpress
 
   vars_prompt:
 
