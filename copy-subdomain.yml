@@ -42,10 +42,15 @@
         handlers_from: none
 
     - name: >-
-        Change the WordPress site server name and database name to correspond to
-        the subdomain that we are copying to
+        Change the WordPress site server name to correspond to the subdomain
+        that we are copying to
       ansible.builtin.set_fact:
         wordpress_site_server_name: "{{ to_be_subdomain }}.{{ domain_name }}"
+
+    - name: >-
+        Change the WordPress site database name to correspond to the subdomain
+        that we are copying to
+      ansible.builtin.set_fact:
         wordpress_site_database_name: "\
           {{ wordpress_site_server_name | regex_replace ('\\.', '_') }}"
 
