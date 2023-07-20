@@ -20,10 +20,10 @@
     - ansible.builtin.set_fact:
         subdomain: "{{ subdomain }}"
 
-  # Delete an instance of the website for any particular subdomain on the
-  # WordPress server that hosts that instance.
+    # Delete an instance of the website for any particular subdomain on the
+    # WordPress server that hosts that instance.
 
-    - ansible.builtin.include_role:
+    - ansible.builtin.import_role:
         name: wordpress_apache
         tasks_from: delete-site
       when: subdomain in subdomains
@@ -32,10 +32,10 @@
 
 #- hosts: gateway
 
-  # Delete a Dynamic DNS record for the website, since it is hosted on the
-  # office network but exposed externally to customer users.  
-
 #  tasks:
+
+    # Delete a Dynamic DNS record for the website, since it is hosted on the
+    # office network but exposed externally to customer users.  
 
 #    - ansible.builtin.import_role:
 #        name: dynamic_dns
