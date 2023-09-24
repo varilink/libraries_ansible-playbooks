@@ -21,7 +21,7 @@ A library of Ansible playbooks that is used as a Git submodule across multiple p
 
 ## Usage
 
-Add this repository as a submodule of other repositories that will use it, with a path within those other projects of `playbooks/`. Then, link `group_vars/` and `host_vars/` directories from those other project within the root directory of this repository, i.e. within that `playbooks/` directory. You can the execute these playbooks from the root directory of any other repository that uses them via:
+Add this repository as a submodule of other repositories that will use it, with a path within those other projects of `playbooks/`. Then, link `group_vars/` and `host_vars/` directories from those other project within the root directory of this repository, i.e. within that `playbooks/` directory. Also, create an `ansible.cfg` file in the root directory of your project to maintain `./roles` relative to that root directory as the `roles_path`. You can the execute these playbooks from the root directory of any other repository that uses them via:
 
 ```sh
 ansible-playbook ./playbooks/PLAYBOOK
