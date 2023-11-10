@@ -6,18 +6,6 @@
 
 - hosts: wordpress
 
-  # Prompt for the subdomain to act upon; for example "dev", "test", "www", etc.
-  # This playbook is restricted to act upon a single subdomain on each run.
-
-  vars_prompt:
-
-    - name: subdomain
-      prompt: What is the subdomain?
-      private: false
-
-  # Create an instance of the website for any particular subdomain on the
-  # WordPress server that hosts that instance.
-
   tasks:
 
     - ansible.builtin.set_fact:
