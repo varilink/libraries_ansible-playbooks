@@ -57,15 +57,16 @@
         dns_record_hostname: "{{ hostvars[dns_record_target].wp_server_name }}"
       when: "'internal' in group_names"
 
-#- hosts: gateway
+- hosts: gateway
 
-#  tasks:
+  tasks:
 
     # Delete a Dynamic DNS record for the website, since it is hosted on the
     # office network but exposed externally to customer users.  
 
-#    - ansible.builtin.import_role:
-#        name: dynamic_dns
-#        tasks_from: delete-project-records
-#      vars:
-#        dynamic_dns_records: [ "{{ subdomain }}" ]
+    - ansible.builtin.import_role:
+        name: dynamic_dns
+        tasks_from: delete-record
+      vars:
+        wp_host: "{{ groups['wordpress'] | intersect(ansible_limit) | first }}"
+        dynamic_dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
