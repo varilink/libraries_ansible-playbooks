@@ -2,7 +2,7 @@
 
   vars_prompt:
 
-    - name: script
+    - name: wp_cli_script
       prompt: What WPI CLI script do you want me to run?
       private: no
 
@@ -14,4 +14,4 @@
       ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
 
         name: wordpress
-        tasks_from: wp-cli-script
+        tasks_from: run-wp-cli-script
