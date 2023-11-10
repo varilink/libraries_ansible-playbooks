@@ -8,10 +8,11 @@
 
   tasks:
 
-    - ansible.builtin.import_role:
     - name: "\
         Perform tasks that are a common precursor to any WordPress site action"
       ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
 
+    - name: Run the requested script against the selected WordPress site
+      ansible.builtin.import_role:
         name: wordpress
         tasks_from: run-wp-cli-script
