@@ -39,6 +39,7 @@
 
     - ansible.builtin.import_role:
         name: dynamic_dns
-        tasks_from: copy-project-records
+        tasks_from: create-record
       vars:
-        dynamic_dns_records: [ "{{ subdomain }}" ]
+        wp_host: "{{ groups['wordpress'] | intersect(ansible_limit) | first }}"
+        dynamic_dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
