@@ -1,0 +1,24 @@
+- hosts: wordpress
+
+  vars_prompt:
+
+    - name: wp_cli_command
+      prompt: Enter the command that you want me to run?
+      private: no
+
+  tasks:
+
+    - name: "\
+        Perform tasks that are a common precursor to any WordPress site action"
+      ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+
+    - ansible.builtin.shell:
+        chdir: "{{ wp_path }}"
+        cmd: "wp {{ wp_cli_command }}"
+        executable: bash
+      register: command_result
+      become: yes
+      become_user: www-data
+
+    - debug:
+        msg: "{{ command_result.stdout }}"
