@@ -1,6 +1,11 @@
 # ------------------------------------------------------------------------------
-# create-site.yml
+# create-wordpress-site.yml
 # ------------------------------------------------------------------------------
+
+# Creates a WordPress site using our default architecture for WordPress sites:
+#  - MariaDB database
+#  - Apache with the PHP module as a combined web and application layer
+#  - A reverse proxy front-end based on Nginx
 
 ---
 

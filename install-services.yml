@@ -1,12 +1,39 @@
 # ------------------------------------------------------------------------------
-# create-services.yml
+# install-services.yml
 # ------------------------------------------------------------------------------
+
+---
+
+# This playbook creates the base services on the Varilink Computing Ltd hosts.
+# Those base services are:
+#  - Backup
+#  - DNS
+#  - Monitor
+#  - WordPress
+#
+# Our hosts play certain roles in the delivery of these services, those roles
+# being:
+#  - gateway
+#  - home
+#  - hub
+#  - wordpress
+#
+# Comments below each hosts array element below describe what each role does as
+# as result of executing each set of tasks.
+#
+# Note that these roles are different to the host names, allowing the hosts
+# fulfilling a role to be swapped. The gateway, home and hub roles are fulfilled
+# by a single host and the mapping is implemented via host aliasing in the
+# Ansible inventory. The wordpress role is fulfilled by multiple hosts and the
+# mapping is implemented using an group, again in the Ansible inventory.
 
 # ------
 # Backup
 # ------
 
 - hosts: all
+
+  # All hosts are backup clients, i.e. all hosts are backed up.
 
   tasks:
 
@@ -15,6 +42,8 @@
       tags: backup
 
 - hosts: hub
+
+  # The hub host is both the backup director and the backup storage controller.
 
   tasks:
 
@@ -36,6 +65,8 @@
       tags: backup
 
 - hosts: home
+
+  # The home host provides the backup dashboard as a web service.
 
   tasks:
 
@@ -68,6 +99,8 @@
 
 - hosts: hub
 
+  # The hub host is the DNS server for the office network.
+
   tasks:
 
     - ansible.builtin.import_role:
@@ -79,6 +112,8 @@
 # -------
 
 - hosts: home
+
+  # The home host provides a Grafana monitoring dashboard for all hosts.
 
   tasks:
 
@@ -94,6 +129,9 @@
 
 - hosts: gateway
 
+  # The gateway hosts provides a route for all external hosts to send their
+  # monitoring data to the home host on the office network.
+
   tasks:
 
     - ansible.builtin.import_role:
@@ -108,6 +146,8 @@
       tags: monitor
 
 - hosts: all
+
+  # All hosts are monitoring clients, i.e. all hosts are monitored.
 
   tasks:
 
@@ -129,6 +169,7 @@
 
 - hosts: wordpress
 
+  # wordpress hosts provide WordPress site hosting services.
 
   tasks:
 

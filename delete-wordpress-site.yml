@@ -2,6 +2,12 @@
 # delete-site.yml
 # ------------------------------------------------------------------------------
 
+# Deletes a WordPress site that uses our default architecture for WordPress
+# sites:
+#  - MariaDB database
+#  - Apache with the PHP module as a combined web and application layer
+#  - A reverse proxy front-end based on Nginx
+
 ---
 
 - hosts: wordpress
