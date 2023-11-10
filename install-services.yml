@@ -127,15 +127,9 @@
 # Web
 # ---
 
-- hosts: dev,prod2
 
-  tasks:
+- hosts: wordpress
 
-    - ansible.builtin.import_role:
-        name: wordpress_nginx
-      tags: web
-
-- hosts: dev,gateway,prod4
 
   tasks:
 
