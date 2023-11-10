@@ -123,10 +123,9 @@
       
       tags: monitor
 
-# ---
-# Web
-# ---
-
+# ---------
+# WordPress
+# ---------
 
 - hosts: wordpress
 
@@ -144,4 +143,4 @@
         - ansible.builtin.import_role:
             name: reverse_proxy
 
-      tags: web
+      tags: wordpress
