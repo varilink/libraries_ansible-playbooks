@@ -6,19 +6,11 @@
 
 - hosts: wordpress
 
-  # Prompt for the subdomain to act upon; for example "dev", "test", "www", etc.
-  # This playbook is restricted to act upon a single subdomain on each run.
-
-  vars_prompt:
-
-    - name: subdomain
-      prompt: What is the subdomain?
-      private: false
-
   tasks:
 
-    - ansible.builtin.set_fact:
-        subdomain: "{{ subdomain }}"
+    - name: "\
+        Perform tasks that are a common precursor to any WordPress site action"
+      ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
 
     # Delete an instance of the website for any particular subdomain on the
     # WordPress server that hosts that instance.
@@ -26,9 +18,7 @@
     - ansible.builtin.import_role:
         name: wordpress_apache
         tasks_from: delete-site
-      when: subdomain in subdomains
       vars:
-        subdomains: "{{ wordpress_sites | map(attribute='subdomain') }}"
 
 #- hosts: gateway
 

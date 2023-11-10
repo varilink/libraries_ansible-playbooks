@@ -2,10 +2,6 @@
 
   vars_prompt:
 
-    - name: subdomain
-      prompt: What subdomain do you want me run a WP CLI script against?
-      private: no
-
     - name: script
       prompt: What WPI CLI script do you want me to run?
       private: no
@@ -13,5 +9,9 @@
   tasks:
 
     - ansible.builtin.import_role:
+    - name: "\
+        Perform tasks that are a common precursor to any WordPress site action"
+      ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+
         name: wordpress
         tasks_from: wp-cli-script

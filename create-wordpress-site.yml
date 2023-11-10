@@ -8,15 +8,15 @@
 
   tasks:
 
-    - ansible.builtin.set_fact:
-        subdomain: "{{ subdomain }}"
+    - name: "\
+        Perform tasks that are a common precursor to any WordPress site action"
+      ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+
 
     - ansible.builtin.include_role:
         name: wordpress_apache
         tasks_from: create-site
-      when: subdomain in subdomains
-      vars:
-        subdomains: "{{ wordpress_sites | map(attribute='subdomain') }}"
+
 
 - hosts: gateway
 

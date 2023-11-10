@@ -1,0 +1,21 @@
+# ------------------------------------------------------------------------------
+# common-tasks/wordpress-action.yml
+# ------------------------------------------------------------------------------
+
+# This task list is called by any playbook at performs a "Wordpress action"; for
+# example:
+#  - create a WordPress site
+#  - delete a WordPress site
+#  - Run a WP-CLI script against a WordPress site
+
+---
+
+- name: Validate an action on a WordPress site
+  ansible.builtin.import_role:
+    name: wordpress
+    tasks_from: validate-site-action
+
+- name: Set facts for the WordPress site that is the target of the action
+  ansible.builtin.import_role:
+    name: wordpress
+    tasks_from: set-site-facts
