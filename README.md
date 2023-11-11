@@ -1,4 +1,4 @@
-# Varilink - Libraries - Ansible Playbooks
+# Libraries - Ansible Playbooks
 
 David Williamson @ Varilink Computing Ltd
 
@@ -10,25 +10,42 @@ A library of Ansible playbooks that is used as a Git submodule across multiple p
 
     Since playbooks are essentially a mapping between hosts and roles, the same playbooks are used in those two repositories, indeed this is fundamental to the value of testing in the [Services - Docker](https://github.com/varilink/services-docker) repository.
 
-2. Many of the playbooks in this repository are used in multiple, website projects. Each of those website projects provides project specific Ansible variables via `group_vars/` and `host_vars` directories, which are used by the common, website project specific playbooks in this repository.
+2. Many of the playbooks in this repository are used in multiple, WordPress website projects. Each of those website projects provides project specific Ansible variables via `group_vars/` and `host_vars` directories, which are used by the common, website project specific playbooks in this repository.
 
 ## Contents
 
-| Playbook               | Type    |
-| ---------------------- | ------- |
-| `copy-certificate.yml` | project |
-| `copy-subdomain.yml`   | project |
+This repository contains the following playbooks in its root folder. As described above, playbooks are either used to manage the Varilink core services (type=serivces) or within WordPress website projects (type=project).
+
+| Playbook                    | Type     | Description                                                                                       |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `copy-certificate.yml`      | project  | Copies a LetsEncrypt SSL certificate from one host to another.                                    |
+| `copy-wordpress-site.yml`   | project  | Copies a WordPress site, can change the subdomain and be within host or from one host to another. |
+| `create-wordpress-site.yml` | project  | Creates a WordPress site.                                                                         |
+| `delete-wordpress-site.yml` | project  | Deletes a WordPress site.                                                                         |
+| `install-services.yml`      | services | Installs the base Varilink services; backup, DNS, monitoring, WordPress hosting, etc.             |
+| `run-wp-cli-command.yml`    | project  | Run a WP-CLI command against a WordPress site.                                                    |
+| `run-wp-cli-script.yml`     | project  | Run a WP-CLI script against a WordPress site.                                                     |
+
+The `common-tasks/` folder contains task lists that are shared across two or more of these playbook.
 
 ## Usage
 
-Add this repository as a submodule of other repositories that will use it, with a path within those other projects of `playbooks/`. Then, link `group_vars/` and `host_vars/` directories from those other project within the root directory of this repository, i.e. within that `playbooks/` directory. Also, create an `ansible.cfg` file in the root directory of your project to maintain `./roles` relative to that root directory as the `roles_path`. You can the execute these playbooks from the root directory of any other repository that uses them via:
+Add this repository as a submodule of other repositories that will use it, with a path within those other projects of `playbooks/`. Then, link `group_vars/` and `host_vars/` directories from those other project within the root directory of this repository, i.e. within that `playbooks/` directory.
+
+Also, install the [Libraries - Ansible Roles](https://github.com/varilink/libraries-ansible_roles) repository as a submodule of those other repositories, with a path of `roles/`. Create an `ansible.cfg` file in the root directory of your project to maintain `./roles` relative to that root directory as the `roles_path`. You can the execute these playbooks from the root directory of any other repository that uses them via:
 
 ```sh
 ansible-playbook ./playbooks/PLAYBOOK
 ```
 Where *PLAYBOOK* is provided by this repository
 
+More detailed usage instructions follows for each individual playbook.
+
 ### copy-certificate.yml
+
+*** OUT OF DATE ***<br>
+The usage instructions for this playbook are out of date, as is the function of the playbook itself.<br>
+*** OUT OF DATE ***
 
 This playbook copies the LetsEncrypt certificate for a FQDN - for example, `www.varilink.co.uk` - from one host to another host. This is useful because sometimes, if I am moving a website from one host to another host the process that I follow is:
 
@@ -58,7 +75,11 @@ The `domain_name` should be configured within the project's Ansible variable fil
 ansible-playbook --extra-vars target_host=prod4 --extra-vars subdomain=www --limit=prod3,prod4,localhost ./playbooks/copy-certificate.yml
 ```
 
-### copy-subdomain.yml
+### copy-wordpress-site.yml
+
+*** OUT OF DATE ***<br>
+The usage instructions for this playbook are out of date, as is the function of the playbook itself.<br>
+*** OUT OF DATE ***
 
 This playbook makes a copy of a WordPress site to another subdomain for the same domain and on the same host; for example makes a copy of `preprod.varilink.co.uk` to `www.varilink.co.uk` on the same host. By *copy* we mean that the new WordPress site will be identical, except that the change in subdomain will be reflected in both its database and its `wp-config.php` file.
 
@@ -86,3 +107,32 @@ The playbook will prompt for three variables:
 The value for `to_be_port` should be a port that is not already used on the host, which can be determined by examination of `/etc/apache2/ports.conf` on that host.
 
 Of course, these variables can also be set using `--extra-vars` on the command line.
+
+### create-wordpress-site.yml
+
+*To be completed*
+
+### delete-wordpress-site.yml
+
+*To be completed*
+
+### install-services.yml
+
+*To be completed*
+
+### run-wp-cli-command.yml
+
+*To be completed*
+
+### run-wp-cli-script
+
+Runs a WP-CLI script against a WordPress site. The script can either be specific to the project or one of the shared scripts from the [Libraries - WP CLI Scripts](https://github.com/varilink/libraries-wp_cli_scripts) repository.
+
+When you run this playbook, it will prompt for the name of the script to run if that hasn't been provided via `--extra-vars`; for example like this:
+
+```sh
+ansible-playbook --limit=gateway --extra-vars wp_cli_script=init ./playbooks/run-wp-cli-script.yml
+```
+
+The `.sh` extension will be added to the name to determine the name of script file to look for. In the example above the script file `init.sh` will be searched for; first in the directory `wordpress/scripts`, which must be the path for project scripts, and then in the directory `wordpress/varilink-scripts`, which must be the path for shared scripts. The `wordpress/varilink-scripts` directory will only be searched if the script is not found in the `wordpress/scripts` directory.
+
