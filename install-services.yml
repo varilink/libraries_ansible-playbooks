@@ -31,9 +31,9 @@
 # Backup
 # ------
 
-- hosts: all
+- hosts: all:!backup_exceptions
 
-  # All hosts are backup clients, i.e. all hosts are backed up.
+  # All hosts are backed up apart from any that are explicit exceptions.
 
   tasks:
 
