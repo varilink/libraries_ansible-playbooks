@@ -27,6 +27,24 @@
 # Ansible inventory. The wordpress role is fulfilled by multiple hosts and the
 # mapping is implemented using an group, again in the Ansible inventory.
 
+# ---
+# DNS
+# ---
+
+- hosts: hub
+
+  # The hub host is the DNS server for the office network. The DNS service must
+  # be installed first because other services are dependent on it having been
+  # installed before they can install; for example, the backup service can't
+  # create a DNS record for the backup web service until the DNS service has
+  # installed and created the /etc/addn-hosts file.
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+      tags: [ backup, dns ]
+
 # ------
 # Backup
 # ------
@@ -92,20 +110,6 @@
           delegate_to: hub
 
       tags: backup
-
-# ---
-# DNS
-# ---
-
-- hosts: hub
-
-  # The hub host is the DNS server for the office network.
-
-  tasks:
-
-    - ansible.builtin.import_role:
-        name: dns
-      tags: dns
 
 # -------
 # Monitor
