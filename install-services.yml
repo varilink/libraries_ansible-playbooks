@@ -8,6 +8,7 @@
 # Those base services are:
 #  - Backup
 #  - DNS
+#  - Dynamic DNS
 #  - Monitor
 #  - WordPress
 #
@@ -44,6 +45,18 @@
     - ansible.builtin.import_role:
         name: dns
       tags: [ backup, dns ]
+
+# -----------
+# Dynamic DNS
+# -----------
+
+- hosts: gateway
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dynamic_dns
+      tags: [ dynamic_dns ]
 
 # ------
 # Backup
