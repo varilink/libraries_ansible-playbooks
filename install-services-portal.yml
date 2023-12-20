@@ -1,0 +1,124 @@
+- hosts: gateway
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "/var/www/portal.varilink.co.uk/laravel/{{ item }}"
+          loop:
+            - routes/web.php
+            - resources/views/backup.blade.php
+            - resources/views/monitor.blade.php
+            - resources/views/components/layout.blade.php
+          become_user: www-data
+
+        - ansible.builtin.import_role:
+            name: nginx
+
+        - ansible.builtin.import_role:
+            name: php_fpm
+
+        - ansible.builtin.file:
+            path: /var/www/portal.varilink.co.uk
+            state: directory
+            group: www-data
+            mode: u=rwx,g=rwx,o=rx
+
+        - ansible.builtin.apt:
+            name: composer
+            install_recommends: no
+
+        - ansible.builtin.stat:
+            path: /var/www/portal.varilink.co.uk/laravel
+          register: laravel
+
+        - community.general.composer:
+            command: create-project
+            arguments: laravel/laravel
+            working_dir: /var/www/portal.varilink.co.uk
+            prefer_dist: yes
+          become_user: www-data
+          when: not laravel.stat.exists
+
+        - ansible.builtin.file:
+            path: "/var/www/portal.varilink.co.uk/laravel/public/\
+              .well-known/acme-challenge/"
+            state: directory
+            owner: www-data
+            group: www-data
+
+        - ansible.builtin.shell: "\
+            certbot certificates |
+            grep 'Certificate Name: portal.varilink.co.uk'"
+          register: certbot_certificates
+          failed_when: "\
+            certbot_certificates.rc != 0 and certbot_certificates.rc != 1"
+          changed_when: false
+
+        - name: Template out the Nginx site configuration
+          ansible.builtin.template:
+            src: portal.varilink.co.uk.conf.j2
+            dest: /etc/nginx/sites-available/portal.varilink.co.uk.conf
+          notify: Nginx configuration changed
+          vars:
+            certbot_certificate_installed_string: |-
+              {%
+                if certbot_certificates.rc is defined and
+                certbot_certificates.rc == 0
+              %}
+              yes
+              {%- else %}
+              no
+              {%- endif %}
+            certbot_certificate_installed: "\
+              {{ certbot_certificate_installed_string | bool }}"
+
+        - name: Enable the Nginx site
+          ansible.builtin.file:
+            path: /etc/nginx/sites-enabled/portal.varilink.co.uk.conf
+            src: /etc/nginx/sites-available/portal.varilink.co.uk.conf
+            state: link
+          notify: Nginx configuration changed
+
+        - name: Flush the handlers to make sure that the site it live
+          meta: flush_handlers
+
+        - ansible.builtin.import_role:
+            name: dynamic_dns
+            tasks_from: create-record
+          vars:
+            dynamic_dns_record_hostname: portal
+
+        - name: Get an SSL certificate
+          ansible.builtin.command: >-
+            certbot -n certonly
+            --webroot -w /var/www/portal.varilink.co.uk/laravel/public
+            -d portal.varilink.co.uk
+          when: not certbot_certificate_installed
+          vars:
+            certbot_certificate_installed_string: |-
+              {%
+                if certbot_certificates.rc is defined and
+                certbot_certificates.rc == 0
+              %}
+              yes
+              {%- else %}
+              no
+              {%- endif %}
+            certbot_certificate_installed: "\
+              {{ certbot_certificate_installed_string | bool }}"
+
+      become: yes
+
+- hosts: hub
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+        tasks_from: create-project-record
+      vars:
+        dns_record_target: gateway
+        dns_record_hostname: portal.varilink.co.uk

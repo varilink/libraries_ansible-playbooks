@@ -1,0 +1,77 @@
+server {
+
+  listen 80;
+  listen [::]:80;
+  server_name portal.varilink.co.uk;
+
+  access_log /var/log/nginx/portal.varilink.co.uk-access.log;
+  error_log /var/log/nginx/portal.varilink.co.uk-error.log;
+
+  root /var/www/portal.varilink.co.uk/laravel/public;
+
+{% if certbot_certificate_installed %}
+  location / {
+    return 301 https://portal.varilink.co.uk$request_uri;
+  }
+{% else %}
+  location / {
+    try_files $uri $uri/ =404;
+  }
+{% endif %}
+
+}
+
+{% if certbot_certificate_installed %}
+server{
+
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  server_name portal.varilink.co.uk;
+  root /var/www/portal.varilink.co.uk/laravel/public;
+
+  access_log /var/log/nginx/portal.varilink.co.uk-access.log;
+  error_log /var/log/nginx/portal.varilink.co.uk-error.log;
+
+  ssl_certificate /etc/letsencrypt/live/portal.varilink.co.uk/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/portal.varilink.co.uk/privkey.pem;
+
+  add_header X-Frame-Options "SAMEORIGIN";
+  add_header X-Content-Type-Options "nosniff";
+
+  index index.php;
+
+  charset utf-8;
+
+  location / {
+    try_files $uri $uri/ /index.php?$query_string;
+  }
+ 
+  location = /favicon.ico { access_log off; log_not_found off; }
+  location = /robots.txt  { access_log off; log_not_found off; }
+
+  location ^~ /bacula/ {
+    rewrite ^/bacula/(.*)$ /$1 break;
+    proxy_pass http://backup.varilink.co.uk;
+    proxy_hide_header X-Frame-Options;
+  }
+
+  location ^~ /grafana/ {
+    proxy_pass http://monitor.varilink.co.uk:3000;
+    proxy_set_header Host $host;
+    proxy_hide_header X-Frame-Options;
+  }
+
+  error_page 404 /index.php;
+ 
+  location ~ \.php$ {
+    fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+    fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+    include fastcgi_params;
+  }
+ 
+  location ~ /\.(?!well-known).* {
+    deny all;
+  }
+
+}
+{% endif %}
