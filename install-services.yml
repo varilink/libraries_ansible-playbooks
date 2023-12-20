@@ -105,6 +105,8 @@
 
         - ansible.builtin.import_role:
             name: backup_web
+          vars:
+            backup_database_host: "{{ hostvars['hub'].ansible_host }}"
 
         - block:
 
@@ -112,7 +114,7 @@
                 name: database
                 tasks_from: create-backup-database
               vars:
-                database_user_host: "{{ ansible_hostname }}"
+                database_user_host: "{{ ansible_hostname }}.{{ domain_name }}"
 
             - ansible.builtin.import_role:
                 name: dns
