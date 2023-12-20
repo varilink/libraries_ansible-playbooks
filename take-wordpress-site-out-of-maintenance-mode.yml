@@ -1,0 +1,18 @@
+- hosts: wordpress
+
+  tasks:
+
+    - ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+
+    - block:
+
+        - ansible.builtin.file:
+            path: "{{ wp_path }}/.maintenance"
+            state: absent
+
+        - ansible.builtin.file:
+            path: "{{ wp_path }}/wp-content/maintenance.php"
+            state: absent
+
+      become: yes
+      become_user: www-data

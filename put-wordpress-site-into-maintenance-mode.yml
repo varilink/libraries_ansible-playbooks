@@ -1,0 +1,23 @@
+- hosts: wordpress
+
+  vars_prompt:
+
+    - name: phpsessid
+      prompt: Enter the PHPSESSID that should bypass maintenance mode
+
+  tasks:
+
+    - ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+
+    - block:
+
+        - ansible.builtin.template:
+            src: .maintenance
+            dest: "{{ wp_path }}"
+
+        - ansible.builtin.template:
+            src: maintenance.php
+            dest: "{{ wp_path }}/wp-content/"
+
+      become: yes
+      become_user: www-data
