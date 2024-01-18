@@ -96,6 +96,18 @@
 
       tags: backup
 
+# --------
+# Calendar
+# --------
+
+- hosts: hub
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: calendar
+      tags: calendar
+
 # ---
 # DNS
 # ---
