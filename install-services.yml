@@ -32,7 +32,7 @@
 # DNS
 # ---
 
-- hosts: hub
+- hosts: dns
 
   # The hub host is the DNS server for the office network. The DNS service must
   # be installed first because other services are dependent on it having been
