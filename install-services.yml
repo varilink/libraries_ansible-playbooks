@@ -44,7 +44,7 @@
 
     - ansible.builtin.import_role:
         name: dns
-      tags: [ backup, monitor, dns ]
+      tags: dns
 
 # -----------
 # Dynamic DNS
@@ -56,7 +56,7 @@
 
     - ansible.builtin.import_role:
         name: dynamic_dns
-      tags: [ dynamic_dns ]
+      tags: dynamic_dns
 
 # ------
 # Backup
@@ -153,15 +153,17 @@
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: monitor_gateway
-      tags: monitor
-      vars:
-        env_uses_ca: no
+    - block:
 
-    - ansible.builtin.import_role:
-        name: dynamic_dns
-        tasks_from: copy-project-records
+        - ansible.builtin.import_role:
+            name: monitor_gateway
+          vars:
+            env_uses_ca: no
+
+        - ansible.builtin.import_role:
+            name: dynamic_dns
+            tasks_from: copy-project-records
+
       tags: monitor
 
 - hosts: all
