@@ -108,6 +108,14 @@
         name: dns
       tags: dns
 
+- hosts: internal
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns_client
+      tags: dns
+
 # -----------
 # Dynamic DNS
 # -----------
