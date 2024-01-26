@@ -120,7 +120,7 @@
         name: dns
       tags: dns
 
-- hosts: internal
+- hosts: internal:!dns
 
   tasks:
 
