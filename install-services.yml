@@ -140,6 +140,30 @@
         name: dynamic_dns
       tags: dynamic_dns
 
+# ----------
+# File Share
+# ----------
+
+- hosts: europe
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: file_share
+      tags: file_share
+
+# ----------
+# Git Origin
+# ----------
+
+- hosts: europe
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: git_origin
+      tags: git_origin
+
 # -------
 # Monitor
 # -------
