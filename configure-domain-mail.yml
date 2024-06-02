@@ -1,0 +1,7 @@
+- hosts: mail
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: mail_external
+        tasks_from: configure-domain

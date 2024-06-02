@@ -118,7 +118,7 @@
 
     - ansible.builtin.import_role:
         name: dns
-        tasks_from: create-project-record
+        tasks_from: create-record
       vars:
         dns_record_target: gateway
         dns_record_hostname: portal.varilink.co.uk
