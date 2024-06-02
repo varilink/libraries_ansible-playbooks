@@ -4,29 +4,36 @@ David Williamson @ Varilink Computing Ltd
 
 ------
 
-A library of Ansible playbooks that is used as a Git submodule across multiple projects. The usual vehicle for reuse in Ansible is Ansible roles, however we also share Ansible playbooks across more than one project repository as follows:
+A library of Ansible playbooks that is reused as a Git submodule across multiple projects. The usual vehicle for reuse in Ansible is Ansible roles, however we also share Ansible playbooks across more than one project repository as follows:
 
 1. We use our [Services - Ansible](https://github.com/varilink/services-ansible) repository to manage the core services across our server estate. This uses our main hosts inventory. We simulate that host inventory in the *now* and *to-be* test environments within our [Services - Docker](https://github.com/varilink/services-docker) repository.
 
-    Since playbooks are essentially a mapping between hosts and roles, the same playbooks are used in those two repositories, indeed this is fundamental to the value of testing in the [Services - Docker](https://github.com/varilink/services-docker) repository.
+    Since playbooks are essentially a mapping between hosts and roles, the same playbooks are used in those two repositories, indeed this is fundamental to the value of testing in the [Services - Docker](https://github.com/varilink/services-docker) repository. We use common aliases for the hosts in our server estate and in the *now* and *to-be* test environments so that the playbooks in this repository can be used in both by referring to these aliases.
 
-2. Many of the playbooks in this repository are used in multiple, WordPress website projects. Each of those website projects provides project specific Ansible variables via `group_vars/` and `host_vars` directories, which are used by the common, website project specific playbooks in this repository.
+2. Many of the playbooks in this repository are used in multiple, mainly WordPress, website projects. Each of those website projects provides project specific Ansible variables via `group_vars/` and `host_vars/` directories, which are then used by the common, website project specific playbooks in this repository to make them applicable to each of these projects.
 
 ## Contents
 
-This repository contains the following playbooks in its root folder. As described above, playbooks are either used to manage the Varilink core services (type=serivces) or within WordPress website projects (type=project).
+This repository contains the following playbooks in its root folder. As described above, playbooks are either used to manage the Varilink core services (type=*serivces*) or within WordPress website projects (type=*project*).
 
-| Playbook                    | Type     | Description                                                                                       |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `copy-certificate.yml`      | project  | Copies a LetsEncrypt SSL certificate from one host to another.                                    |
-| `copy-wordpress-site.yml`   | project  | Copies a WordPress site, can change the subdomain and be within host or from one host to another. |
-| `create-wordpress-site.yml` | project  | Creates a WordPress site.                                                                         |
-| `delete-wordpress-site.yml` | project  | Deletes a WordPress site.                                                                         |
-| `install-services.yml`      | services | Installs the base Varilink services; backup, DNS, monitoring, WordPress hosting, etc.             |
-| `run-wp-cli-command.yml`    | project  | Run a WP-CLI command against a WordPress site.                                                    |
-| `run-wp-cli-script.yml`     | project  | Run a WP-CLI script against a WordPress site.                                                     |
+| Playbook                                          | Type     | Description                                                                                       |
+| ------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `bootstrap-server.yml`                            | services | Bootstraps an office server, that is not a Cloud server nor based on a Raspberry Pi image.        |
+| `configure-domain-mail.yml`                       | project  | Configures the email service for a project domain.                                                |
+| `copy-certificate.yml`                            | project  | Copies a LetsEncrypt SSL certificate from one host to another.                                    |
+| `copy-wordpress-site.yml`                         | project  | Copies a WordPress site, can change the subdomain and be within host or from one host to another. |
+| `create-wordpress-site.yml`                       | project  | Creates a WordPress site.                                                                         |
+| `delete-wordpress-site.yml`                       | project  | Deletes a WordPress site.                                                                         |
+| `install-services-portal.yml`                     | services | Installs a portal to securely expose information about office network hosted services externally. |
+| `install-services.yml`                            | services | Installs the base Varilink services; backup, DNS, monitoring, WordPress hosting, etc.             |
+| `link-backups-to-dropbox.yml`                     | services | Links a host to Dropbox for integration with backup services.                                     |
+| `put-wordpress-site-into-maintenance-mode.yml`    | project  | Puts a WordPress site into maintenance mode.                                                      |
+| `run-wp-cli-command.yml`                          | project  | Run a WP-CLI command against a WordPress site.                                                    |
+| `run-wp-cli-script.yml`                           | project  | Run a WP-CLI script against a WordPress site.                                                     |
+| `stop-services.yml`                               | services | Stops the base Varilink services; backup, DNS, monitoring, WordPress hosting, etc.                |
+| `take-wordpress-site-out-of-maintenance-mode.yml` | project  | Takes a WordPress site out of maintenance mode.                                                   |
 
-The `common-tasks/` folder contains task lists that are shared across two or more of these playbook.
+The `common-tasks/`, `files/` and `templates/` folder contains task lists, files and templates that are shared across two or more of these playbook.
 
 ## Usage
 
@@ -37,9 +44,15 @@ Also, install the [Libraries - Ansible Roles](https://github.com/varilink/librar
 ```sh
 ansible-playbook ./playbooks/PLAYBOOK
 ```
-Where *PLAYBOOK* is provided by this repository
+Where *PLAYBOOK* is provided by this repository and is one of the playbooks listed above. More detailed usage instructions follow for each individual playbook.
 
-More detailed usage instructions follows for each individual playbook.
+### bootstrap-server.yml ###
+
+*To be completed*
+
+### configure-domain-mail.yml ###
+
+*To be completed*
 
 ### copy-certificate.yml
 
@@ -116,7 +129,19 @@ Of course, these variables can also be set using `--extra-vars` on the command l
 
 *To be completed*
 
+### install-services-portal.yml ###
+
+*To be completed*
+
 ### install-services.yml
+
+*To be completed*
+
+### link-backups-to-dropbox.yml ###
+
+*To be completed*
+
+### put-wordpress-site-into-maintenance-mode.yml ###
 
 *To be completed*
 
@@ -136,3 +161,10 @@ ansible-playbook --limit=gateway --extra-vars wp_cli_script=init ./playbooks/run
 
 The `.sh` extension will be added to the name to determine the name of script file to look for. In the example above the script file `init.sh` will be searched for; first in the directory `wordpress/scripts`, which must be the path for project scripts, and then in the directory `wordpress/varilink-scripts`, which must be the path for shared scripts. The `wordpress/varilink-scripts` directory will only be searched if the script is not found in the `wordpress/scripts` directory.
 
+### stop-services.yml ###
+
+*To be completed*
+
+### take-wordpress-site-out-of-maintenance-mode.yml ###
+
+*To be completed*
