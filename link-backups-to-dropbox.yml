@@ -1,0 +1,15 @@
+- hosts: europe
+
+  tasks:
+
+#    - ansible.builtin.import_role:
+#        name: backup_director
+#        tasks_from: link-to-dropbox
+
+    - ansible.builtin.import_role:
+        name: backup_storage
+        tasks_from: link-to-dropbox
+
+#    - ansible.builtin.import_role:
+#        name: backup_dropbox
+#        tasks_from: exclude-from-sync

@@ -1,0 +1,108 @@
+# ------------------------------------------------------------------------------
+# stop-services.yml
+# ------------------------------------------------------------------------------
+
+---
+
+- hosts: all
+
+  gather_facts: no
+
+  vars_prompt:
+
+    - name: disable
+      prompt: Do you also want to disable the service also (y/n)?
+      private: no
+      default: n
+
+  tasks:
+
+    - block:
+
+        - name: Validate the value for "disable" that's been provided
+          ansible.builtin.fail:
+            msg: >-
+              You must answer either "y" or "n" for whether the service should be
+              disabled or not
+          run_once: yes
+          when: disable not in ['y', 'n']
+
+        - name: Set a fact for the disable var
+          ansible.builtin.set_fact:
+            disable: '{{ disable }}'
+
+      tags: [backup, calendar, dns, file_share]
+
+# ------
+# Backup
+# ------
+
+- hosts: hub
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: backup_director
+            tasks_from: stop
+
+        - ansible.builtin.import_role:
+            name: backup_storage
+            tasks_from: stop
+
+        - block:
+
+            - ansible.builtin.import_role:
+                name: backup_director
+                tasks_from: disable
+
+            - ansible.builtin.import_role:
+                name: backup_storage
+                tasks_from: disable
+
+          when: disable == 'y'
+
+      tags: backup
+
+# --------
+# Calendar
+# --------
+
+- hosts: hub
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: calendar
+            tasks_from: stop
+
+        - ansible.builtin.import_role:
+            name: calendar
+            tasks_from: disable
+          when: disable == 'y'
+
+      tags: calendar
+
+# ----------
+# File Share
+# ----------
+
+- hosts: hub
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: file_share
+            tasks_from: stop
+
+        - ansible.builtin.import_role:
+            name: file_share
+            tasks_from: disable
+          when: disable == 'y'
+
+      tags: file_share

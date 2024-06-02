@@ -1,0 +1,129 @@
+# ------------------------------------------------------------------------------
+# boostrap-server.yml
+# ------------------------------------------------------------------------------
+
+# ------
+# Step 1
+# ------
+
+# [bootstrap]
+# europe ansible_host=192.168.1.239
+
+# This playbook bootstraps an office (not Cloud) server that is NOT a Raspberry
+# Pi. The resuseability of this playbook is therefore low, since we only operate
+# a single server that fits this description. However it may come in useful one
+# day to have this playbook.
+
+# This playbook is used immediately after the initial Debian install and before
+# any service roles are applied to the server. For server builds I choose only
+# the "SSH server" and "standard system utilities" options on the "Software
+# selection" screen during the install.
+
+# At this point there is no public SSH key installed on the host for
+# passwordless connection by the admin userid and also no passwordless sudo
+# configured. Therefore on first execution you must use the --ask-pass and
+# --ask-become-pass options to the ansible-playbook command. Note that by
+# default the initial Debian install does not permit SSH connection using the
+# root userid, which is a feature we choose to retain.
+
+# Hanlder restarts networking and so will disconnect Ansible playbook!
+
+# ------
+# Step 2
+# ------
+
+# - Remove [bootstrap] entry from hosts.
+# - Rename host in playbook copy of hosts inventory file
+# - Make entry into SSH config file for new hosts (possibly make this first
+#   step) and also see if it could be automated via ssh_config module
+
+# ------
+# Step 3
+# ------
+
+# ansible-playbook --limit europe --tags backup dns ./playbooks/install-services.yml
+# Copy the generated 
+
+---
+
+- hosts: bootstrap # Put the host in this special group for new servers
+
+  handlers:
+
+    - name: Restart networking service
+      # Note the reload job type is not available for the networking service
+      ansible.builtin.service:
+        name: networking
+        state: restarted
+      become: yes
+
+  tasks:
+
+    - block:
+
+        - name: Install my required base build APT packages
+          ansible.builtin.apt:
+            name:
+              - acl
+              - lm-sensors
+              - python3
+              - sudo
+            install_recommends: no
+
+        - name: Add the admin user to the sudo group
+          ansible.builtin.user:
+            name: "{{ admin_user }}"
+            groups: [ sudo ]
+            append: yes
+
+        - name: Enable passwordless sudo for sudoers
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers
+            line: "%sudo\tALL=(ALL:ALL) NOPASSWD:ALL"
+            regexp: '^%sudo\tALL=\(ALL:ALL\) (?:NOPASSWD:)?ALL$'
+
+        - name: Insert begin block marker for network interface configuration
+          ansible.builtin.lineinfile:
+            path: /etc/network/interfaces
+            line: '# BEGIN ANSIBLE MANAGED BLOCK'
+            insertbefore: "\
+              ^iface {{ ansible_default_ipv4.interface }} inet dhcp$"
+
+        - name: Insert end block marker for network interface configuration
+          ansible.builtin.lineinfile:
+            path: /etc/network/interfaces
+            line: '# END ANSIBLE MANAGED BLOCK'
+            insertafter: "\
+              ^iface {{ ansible_default_ipv4.interface }} inet dhcp$"
+
+        - name: Configure the network interface for this host
+          ansible.builtin.blockinfile:
+            path: /etc/network/interfaces
+            block: |-
+              iface {{ ansible_default_ipv4.interface }} inet static
+                  address 192.168.1.8
+                  broadcast 192.168.1.255
+                  netmask 255.255.255.0
+                  gateway 192.168.1.1
+          notify: Restart networking service
+
+      become: yes
+
+    - name: Create .ssh directory for the admin user
+      ansible.builtin.file:
+        path: '~/.ssh'
+        state: directory
+        mode: o=rwx,g=,o=
+
+    - name: Authorize the public key for the admin user for SSH connections
+      ansible.builtin.copy:
+        dest: '~/.ssh/authorized_keys'
+        content: "\
+          ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDlC9ZiZ54SkSZy8ENUmd4JW0vR+W5IH\
+          xv69wBJMxEau/o0Oco9TjtVT//BcwECu+VL5YcyemOyUFV9QPVU99A6rF6l7Z4tYGr/X4\
+          1qbbo5xt8MOju3gnZZhpfrqOshDNnKK/POx529VkOwwq8ikZp3aEnKcl50lO+RYLdBX/J\
+          DGQ88tWhbKFe4O7RWohMywjcLAEnUNG1FMQyjgCy5wuChqV0fGgy9rasdOvd0pPo7rjZZ\
+          7kg8Jqs3cf5n9XG5LLrcLiVr7fX1VJlbK5oxHFRChvH6WFQCnZrXnhkkkOWBfRZTGfZPJ\
+          bh0M+SSBSZu4lFyO8vwOaITE+GiED3nwg3J \
+          {{ admin_user }}@{{ home_domain}}"
+        mode: o=rw,g=,o=
