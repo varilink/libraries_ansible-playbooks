@@ -75,3 +75,4 @@
       vars:
         wp_host: "{{ groups['wordpress'] | intersect(ansible_limit) | first }}"
         dynamic_dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
+      when: linode_domain_id is defined
