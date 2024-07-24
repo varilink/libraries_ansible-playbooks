@@ -56,9 +56,10 @@
         name: dns
         tasks_from: create-record
       vars:
+        dns_record_hostname: "{{ hostvars[dns_record_target].wp_server_name }}"
         dns_record_target: "\
           {{ groups['wordpress'] | intersect(ansible_limit) | first }}"
-        dns_record_hostname: "{{ hostvars[dns_record_target].wp_server_name }}"
+        dns_record_type: project
       when: "'internal' in group_names"
 
 - hosts: gateway
