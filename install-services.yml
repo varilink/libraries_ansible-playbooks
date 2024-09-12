@@ -42,7 +42,7 @@
 
     - ansible.builtin.import_role:
         name: dns
-      tags: [dns, mail]
+      tags: [backup, dns, mail]
 
 - hosts: gateway
 
@@ -50,7 +50,7 @@
 
     - ansible.builtin.import_role:
         name: dns_api
-      tags: [dns, mail]
+      tags: [backup, dns, mail]
 
 - hosts: internal:!hub
 
@@ -58,7 +58,7 @@
 
     - ansible.builtin.import_role:
         name: dns_client
-      tags: [dns, mail]
+      tags: [backup, dns, mail]
 
 # ------
 # Backup
