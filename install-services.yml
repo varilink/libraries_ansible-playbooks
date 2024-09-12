@@ -99,11 +99,12 @@
         - ansible.builtin.import_role:
             name: backup_web
 
-        - ansible.builtin.import_role:
+        - ansible.builtin.include_role:
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_hostname: backup.{{ home_domain }}
+            dns_record_hostname: backup
+          loop: ['bacula-dir', 'bacula-sd', 'backup']
 
       tags: backup
 
@@ -197,14 +198,13 @@
         - ansible.builtin.import_role:
             name: mail_internal
 
-        - ansible.builtin.import_role:
+        - ansible.builtin.include_role:
             name: dns
             tasks_from: create-record
           vars:
             dns_record_type: service
-            dns_records:
-              - hostname: imap
-              - hostname: smtp
+            dns_record_hostname: "{{ item }}"
+          loop: ['imap', 'smtp', 'webmail']
 
       tags: mail
 
