@@ -116,8 +116,18 @@
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: calendar
+    - block:
+
+        - ansible.builtin.import_role:
+            name: calendar
+
+        - ansible.builtin.include_role:
+            name: dns
+            tasks_from: create-record
+          vars:
+            dns_record_type: service
+            dns_record_hostname: caldav
+
       tags: calendar
 
 # -----------
@@ -140,8 +150,18 @@
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: file_share
+    - block:
+
+        - ansible.builtin.import_role:
+            name: file_share
+
+        - ansible.builtin.include_role:
+            name: dns
+            tasks_from: create-record
+          vars:
+            dns_record_type: service
+            dns_record_hostname: samba
+
       tags: file_share
 
 # ----------
@@ -219,6 +239,13 @@
   tasks:
 
     - block:
+
+        - ansible.builtin.import_role:
+            name: dns
+            tasks_from: create-record
+          vars:
+            dns_record_type: service
+            dns_record_hostname: influxdb
 
         - ansible.builtin.import_role:
             name: monitor_server
