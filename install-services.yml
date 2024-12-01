@@ -103,7 +103,8 @@
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_hostname: backup
+            dns_record_type: service
+            dns_record_hostname: "{{ item }}"
           loop: ['bacula-dir', 'bacula-sd', 'backup']
 
       tags: backup
