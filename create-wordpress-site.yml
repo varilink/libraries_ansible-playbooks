@@ -18,6 +18,12 @@
         tasks_from: site-action-precursors
 
     - ansible.builtin.import_role:
+        name: dns_api
+        tasks_from: create-or-update-wp-site-records
+      delegate_to: gateway
+      when: "'external' in group_names"
+
+    - ansible.builtin.import_role:
         name: database
         tasks_from: create-site
         handlers_from: none
