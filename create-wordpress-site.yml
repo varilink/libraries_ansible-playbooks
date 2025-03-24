@@ -13,13 +13,9 @@
 
   tasks:
 
-    - name: "\
-        Perform tasks that are a common precursor to any WordPress site action"
-      ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+    - ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
 
-    - name: "\
-        Create WordPress site database and the database user used to access it"
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
         name: database
         tasks_from: create-site
         handlers_from: none
@@ -28,18 +24,15 @@
       # remote from the web and application layer on that host.
       delegate_to: "{{ wp_database_host | default(inventory_hostname) }}"
 
-    - name: Install and configure the WordPress site
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
         name: wordpress
         tasks_from: create-site
 
-    - name: Configure Apache for the WordPress site
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
         name: wordpress_apache
         tasks_from: create-site
 
-    - name: Configure Nginx as a reverse proxy for the WordPress site
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
         name: reverse_proxy
         tasks_from: create-site
       # By default the reverse proxy is co-hosted with WordPress web and
@@ -51,8 +44,7 @@
 
   tasks:
 
-    - name: Add DNS record for the WordPress site to the office DNS service
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
         name: dns
         tasks_from: create-record
       vars:
