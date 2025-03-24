@@ -2,7 +2,9 @@
 
   tasks:
 
-    - ansible.builtin.import_tasks: ./common-tasks/wordpress-action.yml
+    - ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: site-action-precursors
 
     - block:
 
