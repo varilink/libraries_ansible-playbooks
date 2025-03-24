@@ -1,0 +1,83 @@
+# ------------------------------------------------------------------------------
+# restore-wordpress-site.yml
+# ------------------------------------------------------------------------------
+
+# This playbook uses the backup within the `backup/` directory of the Ansible
+# repository for a WordPress site project to restore to a hosted instance of
+# that project's WordPress site. It's intended to be used when the target
+# instance of the WordPress site already exists, i.e. not to create a WordPress
+# site instance from scratch.
+#
+# If you restore to a subdomain that is different to the one from which the
+# backup is taken then you will need to follow up the restore with WP CLI
+# commands after the restore as follows:
+# 
+# `search-replace <old> <new>`
+# To replace occurrences of the FQDN from the backup with the FQDN for the
+# restored WordPress site.
+#
+# `user update <user> --user_pass=<password>`
+# To restore the correct password for at least the main admin user account.
+#
+# Of course, the run-wp-cli-command.yml playbook can be used for this purpose.
+#
+# If the backup used is based on a development instance of the WordPress site on
+# the desktop, then of course that's reflected in the old FQDN that needs to be
+# replace and also it's VERY IMPORTANT to remove the admin account that we use
+# on the desktop so as not to create a security exposure in the restored
+# WordPress site.
+#
+# Note that the restore excludes the wp-config.php file, which most of the time
+# is what you want, but if it isn't what you want then of course you'll need to
+# sort something out manually.
+
+---
+
+- hosts: wordpress
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: site-action-precursors
+
+    - name: Ensure that /tmp/html is absent on the localhost
+      ansible.builtin.file:
+        path: "/tmp/html"
+        state: absent
+      delegate_to: localhost
+
+    - name: Unarchive the WordPress files on the localhost ready to synchronize
+      ansible.builtin.unarchive:
+        src: "../backup/html.tar.gz"
+        dest: "/tmp"
+        extra_opts:
+          - "--exclude=wp-config-docker.php"
+          - "--exclude=wp-config-sample.php"
+          - "--exclude=wp-config.php"
+      delegate_to: localhost
+
+    - name: Synchronize the WordPress files from the backup with the target
+      ansible.builtin.synchronize:
+        src: "/tmp/html/"
+        dest: "{{ wp_path }}"
+        delete: yes
+        rsync_opts:
+          - "--chown=www-data:www-data"
+          - "--filter='protect wp-config.php'"
+      become: yes
+
+    - name: Copy the database export to the target
+      ansible.builtin.copy:
+        src: "../backup/database.sql.gz"
+        dest: "/tmp/"
+
+    - name: Gunzip the database backup
+      ansible.builtin.command: gunzip --force /tmp/database.sql.gz
+
+    - name: Import the database backup
+      ansible.builtin.shell : >-
+        wp --path={{ wp_path }}
+        db import /tmp/database.sql
+      become: yes
+      become_user: www-data
