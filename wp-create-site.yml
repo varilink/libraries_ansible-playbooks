@@ -16,12 +16,14 @@
     - ansible.builtin.import_role:
         name: wordpress
         tasks_from: site-action-precursors
+      tags: always
 
     - ansible.builtin.import_role:
         name: dns_api
         tasks_from: create-or-update-wp-site-records
       delegate_to: gateway
       when: "'external' in group_names"
+      tags: dns
 
     - ansible.builtin.import_role:
         name: database
@@ -31,14 +33,17 @@
       # layer. However, if wp_database_host is defined then it will be installed
       # remote from the web and application layer on that host.
       delegate_to: "{{ wp_database_host | default(inventory_hostname) }}"
+      tags: database
 
     - ansible.builtin.import_role:
         name: wordpress
         tasks_from: create-site
+      tags: wordpress
 
     - ansible.builtin.import_role:
         name: wordpress_apache
         tasks_from: create-site
+      tags: webserver
 
     - ansible.builtin.import_role:
         name: reverse_proxy
@@ -47,6 +52,7 @@
       # application layer. However, if wp_database_host is defined then it will
       # be installed remote from the web and application layer on that host.
       delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+      tags: proxy
 
 - hosts: hub
 
@@ -61,6 +67,7 @@
           {{ groups['wordpress'] | intersect(ansible_limit) | first }}"
         dns_record_type: project
       when: "'internal' in group_names"
+      tags: dns
 
 - hosts: gateway
 
@@ -76,3 +83,4 @@
         wp_host: "{{ groups['wordpress'] | intersect(ansible_limit) | first }}"
         dynamic_dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
       when: linode_domain_id is defined
+      tags: dns
