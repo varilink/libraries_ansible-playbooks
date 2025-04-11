@@ -103,7 +103,7 @@
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_type: service
+            dns_record_group: service
             dns_record_hostname: "{{ item }}"
           loop: ['bacula-dir', 'bacula-sd', 'backup']
 
@@ -126,7 +126,7 @@
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_type: service
+            dns_record_group: service
             dns_record_hostname: caldav
 
       tags: calendar
@@ -160,7 +160,7 @@
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_type: service
+            dns_record_group: service
             dns_record_hostname: samba
 
       tags: file_share
@@ -223,7 +223,7 @@
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_type: service
+            dns_record_group: service
             dns_record_hostname: "{{ item }}"
           loop: ['imap', 'smtp', 'webmail']
 
@@ -245,7 +245,7 @@
             name: dns
             tasks_from: create-record
           vars:
-            dns_record_type: service
+            dns_record_group: service
             dns_record_hostname: influxdb
 
         - ansible.builtin.import_role:
