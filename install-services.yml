@@ -201,7 +201,7 @@
 
     - ansible.builtin.import_role:
         name: dns_api
-        tasks_from: create-record
+        tasks_from: create-or-update-record
       vars:
         dns_records:
           - hostname: "imap.{{ domain_name }}"
