@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------------
-# create-wordpress-site.yml
+# wp-create-site.yml
 # ------------------------------------------------------------------------------
 
 # Creates a WordPress site using our default architecture for WordPress sites:
