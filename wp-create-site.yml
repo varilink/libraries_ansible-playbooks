@@ -23,6 +23,8 @@
         tasks_from: create-or-update-address-records
       delegate_to: gateway
       when: "'external' in group_names"
+      vars:
+        dns_record_hostname: "{{ wp_subdomain }}"
       tags: dns
 
     - ansible.builtin.import_role:
