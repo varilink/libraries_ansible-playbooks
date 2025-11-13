@@ -20,7 +20,7 @@
 
     - ansible.builtin.import_role:
         name: dns_api
-        tasks_from: create-or-update-wp-site-records
+        tasks_from: create-or-update-address-records
       delegate_to: gateway
       when: "'external' in group_names"
       tags: dns
