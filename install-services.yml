@@ -123,7 +123,7 @@
         - ansible.builtin.import_role:
             name: calendar
 
-        - ansible.builtin.include_role:
+        - ansible.builtin.import_role:
             name: dns
             tasks_from: create-record
           vars:
@@ -157,7 +157,7 @@
         - ansible.builtin.import_role:
             name: file_share
 
-        - ansible.builtin.include_role:
+        - ansible.builtin.import_role:
             name: dns
             tasks_from: create-record
           vars:
