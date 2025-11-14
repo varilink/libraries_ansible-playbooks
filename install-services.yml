@@ -99,7 +99,8 @@
         - ansible.builtin.import_role:
             name: backup_web
 
-        - ansible.builtin.include_role:
+        - name: Create records in office DNS for backup services
+          ansible.builtin.include_role:
             name: dns
             tasks_from: create-record
           vars:
@@ -219,7 +220,8 @@
         - ansible.builtin.import_role:
             name: mail_internal
 
-        - ansible.builtin.include_role:
+        - name: Create records in office DNS for mail services
+          ansible.builtin.include_role:
             name: dns
             tasks_from: create-record
           vars:
