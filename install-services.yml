@@ -221,6 +221,12 @@
             name: mail_internal
 
         - name: Create records in office DNS for mail services
+          # The included task list here notifies a handler to restart the
+          # Dnsmasq service in the event of configuration change. If more than
+          # one loop changes the configuration then the service will restart
+          # multiple times, which is obviously unnecessary. The suggested fix
+          # is to set a fact on change in the included task list and use that to
+          # determine whether to notify the handler outside of the include loop.
           ansible.builtin.include_role:
             name: dns
             tasks_from: create-record
