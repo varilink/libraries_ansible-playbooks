@@ -237,6 +237,13 @@
 
       tags: mail
 
+- hosts: all:!mail:!hub
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: mta
+
 # -------
 # Monitor
 # -------
