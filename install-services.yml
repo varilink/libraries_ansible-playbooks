@@ -200,15 +200,21 @@
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: dns_api
-        tasks_from: create-or-update-record
-      vars:
-        dns_records:
-          - hostname: "imap.{{ domain_name }}"
-            target: mail
-          - hostname: "smtp.{{ domain_name }}"
-            target: mail
+    - block:
+
+        - ansible.builtin.import_role:
+            name: mail_certificates
+
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-record
+          vars:
+            dns_records:
+              - hostname: "imap.{{ domain_name }}"
+                target: mail
+              - hostname: "smtp.{{ domain_name }}"
+                target: mail
+
       tags: mail
 
 - hosts: hub
