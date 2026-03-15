@@ -6,11 +6,33 @@ David Williamson @ Varilink Computing Ltd
 
 A library of Ansible playbooks that is reused as a Git submodule across multiple projects. The usual vehicle for reuse in Ansible is Ansible roles, however we also share Ansible playbooks across more than one project repository as follows:
 
-1. We use our [Services - Ansible](https://github.com/varilink/services-ansible) repository to manage the core services across our server estate. This uses our main hosts inventory. We simulate that host inventory in the *now* and *to-be* test environments within our [Services - Docker](https://github.com/varilink/services-docker) repository.
-
-    Since playbooks are essentially a mapping between hosts and roles, the same playbooks are used in those two repositories, indeed this is fundamental to the value of testing in the [Services - Docker](https://github.com/varilink/services-docker) repository. We use common aliases for the hosts in our server estate and in the *now* and *to-be* test environments so that the playbooks in this repository can be used in both by referring to these aliases.
+1. We use our [Services - Ansible](https://github.com/varilink/services-ansible) repository to manage the core services across our server estate. This uses our main hosts inventory. That host inventory is simulated in the *now* and *to-be* test environments within our [Services - Docker](https://github.com/varilink/services-docker) repository.
 
 2. Many of the playbooks in this repository are used in multiple, mainly WordPress, website projects. Each of those website projects provides project specific Ansible variables via `group_vars/` and `host_vars/` directories, which are then used by the common, website project specific playbooks in this repository to make them applicable to each of these projects.
+
+## Services Topology
+
+The [Services - Ansible](https://github.com/varilink/services-ansible) and [Services - Docker](https://github.com/varilink/services-docker) repositories both use the Ansible roles in the [Libraries - Ansible Roles](https://github.com/varilink/libraries_ansible-roles) and the Ansible playbooks provided by this repository. That is fundamental to the value of the [Services - Docker](https://github.com/varilink/services-docker) repository as it means that it can be used to test our Ansible playbooks and roles libraries ahead of running them targetting our live hosts.
+
+In order to enable this the patterns used in the hosts lines to scope plays in the playbooks in this repository use a combination of:
+
+1. Group names that can then be mapped to the environment specific hosts within each environment's hosts inventory.
+
+| Group Name        | Used For That                             |
+| ----------------- | ----------------------------------------- |
+| backup_exceptions | Are not to be backed up.                  |
+| dns               | Provide a DNS service.                    |
+| external          | Are external to our office network.       |
+| internal          | Are within our office network.            |
+| wordpress         | Provide a WordPress site hosting service. |
+
+2. Aliases for those single Ansible hosts that fulfil a specific function within our server estate.
+
+| Alias   | Used For                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------- |
+| gateway | Host that provides Internet gateway services at the boundary of our internal, office network. |
+| hub     | Main office based host that provides all our internal, office network business services.      |
+| mail    | Our external, Internet hosted, email gateway host.                                            |
 
 ## Contents
 
