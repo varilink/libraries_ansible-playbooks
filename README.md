@@ -60,9 +60,34 @@ This repository also contains `files/` and `templates/` folders that are used by
 
 ## Usage
 
-Add this repository as a submodule of other repositories that will use it, with a path within those other projects of `playbooks/`. Then, link `group_vars/` and `host_vars/` directories from those other project within the root directory of this repository, i.e. within that `playbooks/` directory.
+In order to use the playbooks provided by this repository within an Ansible project repository you must do the following:
 
-Also, install the [Libraries - Ansible Roles](https://github.com/varilink/libraries-ansible_roles) repository as a submodule of those other repositories, with a path of `roles/`. Create an `ansible.cfg` file in the root directory of your project to maintain `./roles` relative to that root directory as the `roles_path`. You can the execute these playbooks from the root directory of any other repository that uses them via:
+1. Add this repository as a submodule of the Ansible project repository at the path `playbooks/`.
+
+2. Add the [Libraries - Ansible Roles](https://github.com/varilink/libraries-ansible_roles) repository as a submodule of the Ansible project repository at the path `roles/`.
+
+3. If you need to provide project specific Ansible variables, then add an `inventory/` directory to your Ansible project repository.
+
+4. Within that `inventory/` directory, add a `hosts.yml` file with the following contents:
+
+```yaml
+all:
+  children: {}
+```
+
+5. Create `inventory/group_vars/` and/or `inventory/host_vars/` directories and define your project specific variables within them.
+
+6. With the project's root directory, create an `ansible.cfg` file with the following contents:
+
+```conf
+[defaults]
+inventory = /etc/ansible,./inventory
+roles_path = ./roles
+```
+
+Remember that steps 3, 4 and 5 as well as the `inventory = /etc/ansible,./inventory` line in the `ansible.cfg` file are only required if you need to create project specific Ansible variables. It's very common that you will need to do this but you can omit these aspects if you don't.
+
+You can then execute these playbooks from the root directory of any other repository that uses them via:
 
 ```sh
 ansible-playbook ./playbooks/PLAYBOOK
