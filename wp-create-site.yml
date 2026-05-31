@@ -9,6 +9,20 @@
 
 ---
 
+- hosts: gateway
+
+  # Configure a Dynamic DNS record for the website, since it is hosted on the
+  # office network but exposed externally to customer users.  
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dynamic_dns
+        tasks_from: create-record
+      vars:
+        dns_record_hostname: "{{ wp_subdomain }}"
+      tags: dns
+
 - hosts: wordpress
 
   tasks:
@@ -69,20 +83,4 @@
           {{ groups['wordpress'] | intersect(ansible_limit) | first }}"
         dns_record_type: project
       when: "'internal' in group_names"
-      tags: dns
-
-- hosts: gateway
-
-  # Configure a Dynamic DNS record for the website, since it is hosted on the
-  # office network but exposed externally to customer users.  
-
-  tasks:
-
-    - ansible.builtin.import_role:
-        name: dynamic_dns
-        tasks_from: create-record
-      vars:
-        wp_host: "{{ groups['wordpress'] | intersect(ansible_limit) | first }}"
-        dynamic_dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
-      when: linode_domain_id is defined
       tags: dns
