@@ -250,6 +250,8 @@
     - ansible.builtin.import_role:
         name: mta
 
+      tags: mail
+
 # -------
 # Monitor
 # -------
