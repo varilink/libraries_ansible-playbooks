@@ -338,7 +338,9 @@
         - ansible.builtin.import_role:
             name: reverse_proxy
 
-        - ansible.builtin.import_role:
-            name: dns_api
+# Don't now follow the reasoning why the dns_api role would be needed on a
+# WordPress server. Investigate.
+#        - ansible.builtin.import_role:
+#            name: dns_api
 
       tags: wordpress
