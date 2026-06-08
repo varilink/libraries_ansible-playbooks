@@ -185,36 +185,29 @@ The `.sh` extension will be added to the name to determine the name of script fi
 
 ### wp-copy-site.yml
 
-*** OUT OF DATE ***<br>
-The usage instructions for this playbook are out of date, as is the function of the playbook itself.<br>
-*** OUT OF DATE ***
+This playbook takes a copy of one instance of the website for a domain (the copy "from instance") and restores it as another instance of the website for the same domain (the copy "to instance"). The to instance can be on a different host to the host for the from instance and/or for a different subdomain to the subdomain for the from instance.
 
-This playbook makes a copy of a WordPress site to another subdomain for the same domain and on the same host; for example makes a copy of `preprod.varilink.co.uk` to `www.varilink.co.uk` on the same host. By *copy* we mean that the new WordPress site will be identical, except that the change in subdomain will be reflected in both its database and its `wp-config.php` file.
-
-The example given above reflects a common usage scenario for this playbook; for example as follows:
-
-1. `www.varilink.co.uk` is hosted on `prod3` and we want to move it to `prod4`.
-
-2. We create `preprod.varilink.co.uk` on `prod4` and develop and test it until we are confident that it's ready to replace the existing `www.varilink.co.uk`.
-
-3. We copy `preprod.varilink.co.uk` on `prod4` to `www.varilink.co.uk`, also on `prod4`, ahead of making the DNS change to make it the new, live `www.varilink.co.uk`.
-
-To run this playbook; for example:
+This playbook will prompt for the `from_host` and the `to_host` and will only act on those hosts, so there's no need to use the `--limit` option to the `ansible-playbook` command when running this playbook. Of course these variables can also be set on the command line, in which case the playbook won't prompt for them; for example:
 
 ```sh
-ansible-playbook --limit=prod4 ./playbooks/copy-subdomain.yml
+ansible-playbook --extra-vars from_host=prod4 --extra-vars to_host=prod5 ./playbooks/wp-copy-site.yml
 ```
 
-Note that since this playbook works on one host only, you should use `--limit` as above to target the relevant, specific host.
+If either of the hosts is configured for only a single subdomain, then that subdomain will be automatically selected as the from subdomain on the from host or to subdomain on the to host. If either of the hosts is configured for multiple subdomains then the playbook will prompt the user to select the subdomain to be used.
 
-The playbook will prompt for three variables:
-- `current_subdomain`; for example `preprod`
-- `to_be_subdomain`; for example `www`
-- `to_be_port`; for example `8084`
+In essence, the playbook consists of two steps. The first step generates two files in the `/tmp` directory on the controller:
 
-The value for `to_be_port` should be a port that is not already used on the host, which can be determined by examination of `/etc/apache2/ports.conf` on that host.
+1. A compressed tar archive of the copy from website's WordPress files, with the name `[FQDN]-[YYYY-MM-DD]-[RANDOM_HEX_STRING].tgz`. The generated *random hex string* will be 7 characters long.
 
-Of course, these variables can also be set using `--extra-vars` on the command line.
+2. A compressed SQL file containing a dump of the copy from website's database, with the name `[DATABASE]-[YYYY-MM-DD]-[RANDOM_HEX_STRING].sql.gz`. For WordPress sites, we generate the database name from the FQDN, with the `.` separators replaced by underscore characters.
+
+When these files are generated in the same playbook execution, they will share in their file names the same date, which is the date of they are generated, and the same randomly generated hex string.
+
+The second step uses these two files to create or update the copy to website based on their contents. If you ever want to rerun the second step without generating new export files from the copy from website but reusing export files that remain on the controller from a previous run, you can do so using command line vars, in the way illustrated in this example:
+
+```sh
+ansible-playbook --extra-vars from_host=prod4 --extra-vars to_host=prod5 --extra-vars dump_date_string=2026-06-05 --extra-vars dump_hex_string=08c83bf ./playbooks/wp-copy-site.yml
+```
 
 ### wp-create-site.yml
 

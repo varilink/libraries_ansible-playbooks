@@ -1,109 +1,257 @@
 # ------------------------------------------------------------------------------
-# copy-subdomain.yml
+# wp-copy-site.yml
 # ------------------------------------------------------------------------------
+
+# See:
+# https://github.com/varilink/libraries_ansible-playbooks#wp-copy-siteyml
+
+# This playbook contains four plays as follows:
+# 1. localhost - sets up the from_host play
+# 2. from_host - fetches dump files for the from website instance
+# 3. localhost - sets up the to-host play
+# 4. to_host - updates the to website instance from the dump files
 
 ---
 
-- hosts: wordpress
+- hosts: localhost
 
   vars_prompt:
 
-    - name: current_subdomain
-      prompt: |-
-        What is the current subdomain; for example "dev", "test", "www" etc.?
-      private: false
-
-    - name: to_be_subdomain
-      prompt: |-
-        What is the to-be subdomain; for example "dev", "test", "www" etc.?
-      private: false
-
-    - name: to_be_port
-      # See the comments in the task "Override the configured current port with
-      # the new to-be port" below.
-      prompt: What port should I allocate for the to-be subdomain?
+    - name: from_host
+      prompt: What host are we copying from?
       private: false
 
   tasks:
-  
-    - name: Get site vars based on the current subdomain
-      # It will be the current subdomain that is configured via the project's
-      # Ansible variables.  
-      ansible.builtin.import_role:
+
+    - ansible.builtin.add_host:
+        name: "{{ from_host }}"
+        groups: from_host
+
+    - name: Set a date string to use in dump file names
+      ansible.builtin.set_fact:
+        dump_date_string: "{{ ansible_facts['date_time']['date'] }}"
+      when: dump_date_string is not defined
+
+    - name: Set a hex string to use in dump file names
+      ansible.builtin.set_fact:
+        dump_hex_string: "\
+          {% set hexchars = [0,1,2,3,4,5,6,7,8,9,'a','b','c','d','e','f'] %}\
+          {% for n in range(7) %}{{ hexchars | random }}{% endfor %}"
+      when: dump_hex_string is not defined
+
+- hosts: wordpress:&from_host
+
+  tasks:
+
+    - block:
+
+        - name: >-
+            Prompt for the subdomain to copy from when there's more than one
+            subdomain configured for the from host
+          ansible.builtin.pause:
+            prompt: >-
+              What subdomain are we copying from (
+              {{-
+                (wp_sites.keys() | map('quote') | list)[:-1] | join(', ')
+              }}
+              or {{ (wp_sites.keys() | map('quote') | list)[-1] }})
+          register: subdomain_prompt
+
+        - name: Set wp_subdomain as selected subdomain
+          ansible.builtin.set_fact:
+            wp_subdomain: "{{ subdomain_prompt.user_input }}"
+
+      when: wp_subdomain is not defined
+
+    - name: Report the subdomain that we are copying from
+      debug:
+        msg: Copying from subdomain {{ wp_subdomain }} on this host
+
+    - ansible.builtin.import_role:
         name: wordpress
-        tasks_from: get-site-vars
+        tasks_from: set-site-facts
+
+    - name: Set the db_dump_file and wp_files archive facts
+      ansible.builtin.set_fact:
+        db_dump_file: "\
+          {{ wp_database_name }}-\
+          {{ dump_date_string |
+            default(hostvars['localhost']['dump_date_string']) }}-\
+          {{ dump_hex_string |
+            default(hostvars['localhost']['dump_hex_string']) }}.sql.gz"
+        wp_files_archive: "\
+          {{ wp_server_name }}-\
+          {{ dump_date_string |
+            default(hostvars['localhost']['dump_date_string']) }}-\
+          {{ dump_hex_string |
+            default(hostvars['localhost']['dump_hex_string']) }}.tgz"
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: database
+            tasks_from: dump-site
+            handlers_from: none
+
+        - name: Fetch the database dump that we've just created
+          ansible.builtin.fetch:
+            src: "/tmp/{{ dump_file }}"
+            dest: "/tmp/"
+            flat: true
+
+        - block:
+
+            - name: Delete the database dump from the remove host
+              ansible.builtin.file:
+                path: "/tmp/{{ dump_file }}"
+                state: absent
+
+
+          become: yes
+
+      when: not lookup('ansible.builtin.fileglob', '/tmp/' ~ dump_file)
+
       vars:
-        subdomain: "{{ current_subdomain }}"
+        dump_file: "\
+          {{ wp_database_name }}-\
+          {{ dump_date_string |
+            default(hostvars['localhost']['dump_date_string']) }}-\
+          {{ dump_hex_string |
+            default(hostvars['localhost']['dump_hex_string']) }}.sql.gz"
 
-    - name: Import the tasks to dump a WordPress site database
-      ansible.builtin.import_role:
-        name: database
-        tasks_from: dump-site
-        handlers_from: none
+    - block:
 
-    - name: >-
-        Change the WordPress site server name to correspond to the subdomain
-        that we are copying to
-      ansible.builtin.set_fact:
-        wordpress_site_server_name: "{{ to_be_subdomain }}.{{ domain_name }}"
+        - name: >-
+            Create an archive of the WordPress site files on the remote host
+          community.general.archive:
+            path: /var/www/{{ wp_server_name }}/html/
+            dest: /tmp/{{ dump_file }}
+            exclusion_patterns:
+              - 'wp-config.php'
+          become: yes
 
-    - name: >-
-        Change the WordPress site database name to correspond to the subdomain
-        that we are copying to
-      ansible.builtin.set_fact:
-        wordpress_site_database_name: "\
-          {{ wordpress_site_server_name | regex_replace ('\\.', '_') }}"
+        - name: Fetch the WordPress files dump that we've just created
+          ansible.builtin.fetch:
+            src: "/tmp/{{ dump_file }}"
+            dest: "/tmp/"
+            flat: true
 
-    - name: Import tasks to import the dump file to the new subdomain's database
-      # This uses the dump file that was generated in the previous task "Import
-      # the tasks to dump a WordPress site database"
-      ansible.builtin.import_role:
+        - name: Delete the WordPress dump from the remote host
+          ansible.builtin.file:
+            path: "/tmp/{{ dump_file }}"
+            state: absent
+          become: yes
+
+      when: not lookup('ansible.builtin.fileglob', '/tmp/' ~ dump_file)
+
+      vars:
+        dump_file: "\
+          {{ wp_server_name }}-\
+          {{ dump_date_string |
+            default(hostvars['localhost']['dump_date_string']) }}-\
+          {{ dump_hex_string |
+            default(hostvars['localhost']['dump_hex_string']) }}.tgz"
+
+- hosts: localhost
+  gather_facts: false
+
+  vars_prompt:
+
+    - name: to_host
+      prompt: What host are we copying to?
+      private: false
+
+  tasks:
+
+    - ansible.builtin.add_host:
+        name: "{{ to_host }}"
+        groups: to_host
+
+- hosts: wordpress:&to_host
+
+  vars:
+
+    db_dump_file: "{{ hostvars[from_host]['db_dump_file'] }}"
+    wp_files_archive: "{{ hostvars[from_host]['wp_files_archive'] }}"
+
+  tasks:
+
+    - block:
+
+        - name: >-
+            Prompt for the subdomain to copy to when there's more than one
+            subdomain configured for the to host
+          ansible.builtin.pause:
+            prompt: >-
+              What subdomain are we copying from (
+              {{- (wp_sites.keys() | map('quote') | list)[:-1] | join(', ') }}
+              or {{ (wp_sites.keys() | map('quote') | list)[-1] }})
+          register: subdomain_prompt
+
+        - name: Set wp_subdomain as selected subdomain
+          ansible.builtin.set_fact:
+            wp_subdomain: "{{ subdomain_prompt.user_input }}"
+
+      when: wp_subdomain is not defined
+
+    - name: Report the subdomain that we are copying to
+      debug:
+         msg: Copying to subdomain {{ wp_subdomain }} on this host
+
+    - ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: set-site-facts
+
+    - name: Copy the database dump file to the to host
+      ansible.builtin.copy:
+        src: "/tmp/{{ db_dump_file }}"
+        dest: "/tmp/"
+
+    - ansible.builtin.import_role:
+        # This will use the dump file that was copied in the previous task.
         name: database
         tasks_from: import-site
         handlers_from: none
+      vars:
+        dump_file: "{{ db_dump_file }}"
 
-    - name: Import the tasks to create a WordPress site's database
-      # The new subdomain's database already exists but this will have the
-      # effect of creating the corresponding WordPress database user.
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
+        # The to instance's database already exists but this will have the
+        # effect of aligning the WordPress database use to what is configured
+        # for the to instance.
         name: database
         tasks_from: create-site
         handlers_from: none
 
     - block:
 
-        - name: Create the top-level WordPress directory for the new subdomain
+        - name: >-
+            Ensure that the top-level WordPress directory for the to instance
+            exists
           ansible.builtin.file:
-            path: "/var/www/{{ wordpress_site_server_name }}"
+            path: "/var/www/{{ wp_server_name }}/"
             state: directory
 
         - name: >-
-            Remove the html directory for the to-be subdomain so that we replace
-            all of its content in the subsequent copy task
+            Remove the html directory for the to instance so that any files
+            there that are not in the archive are deleted
           ansible.builtin.file:
-            path: "/var/www/{{ wordpress_site_server_name }}/html"
+            path: "/var/www/{{ wp_server_name }}/html"
             state: absent
 
-        - name: >-
-            Copy the WordPress files from the current subdomain to the new
-            subdomain
-          ansible.builtin.copy:
-            src: "{{ wordpress_site_path }}"
-            remote_src: true
-            dest: "/var/www/{{ wordpress_site_server_name }}"
-
-        - name: >-
-            Remove the wp-config.php file so that it will be recreated when we
-            import WordPress create site tasks
+        - name: Recreate the html directory for the to instance
           ansible.builtin.file:
-            path: "/var/www/{{ wordpress_site_server_name }}/html/wp-config.php"
-            state: absent
+            path: "/var/www/{{ wp_server_name }}/html/"
+            state: directory
+            owner: www-data
+            group: www-data
+
+        - name: Unarchive the WordPress site files on the to host
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ wp_files_archive }}"
+            dest: "/var/www/{{ wp_server_name }}/html/"
 
       become: yes
-
-    - name: Change the WordPress site path to that of the new subdomain
-      ansible.builtin.set_fact:
-        wordpress_site_path: "/var/www/{{ wordpress_site_server_name }}/html"
 
     - name: Set WordPress site plugin and theme facts to empty
       # The site vars that we got in the task "Get site vars based on the
@@ -116,54 +264,38 @@
         wordpress_site_plugins: []
         wordpress_site_themes: []
 
-    - name: Import the WordPress tasks to create a site
-      # We've already partially created the site for the new subdomain by
-      # copying from the site for the current subdomain. Importing these tasks
-      # will complete the job.
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
+        # We do this solely to create the wp-config.php file from the site's
+        # configuration defined in the Ansible vars.
         name: wordpress
-        tasks_from: create-site.yml
+        tasks_from: create-site
 
-    - name: >-
-        Do a WordPress search and replace from the current subdomain to the
-        to-be subdomain
-      ansible.builtin.command: >-
-        wp --path={{ wordpress_site_path }} search-replace
-        {{ current_subdomain }}.{{ domain_name }}
-        {{ wordpress_site_server_name }}
+    - block:
+
+        - name: >-
+            Do a WordPress search and replace from the current subdomain to the
+            to-be subdomain
+          ansible.builtin.command: >-
+            wp --path={{ wp_path }} search-replace
+            {{ hostvars[from_host]['wp_server_name'] }}
+            {{ wp_server_name }}
+
+        - name: >-
+            Reset the password for the admin user to that configured for this
+            subdomain
+          ansible.builtin.command: >-
+            wp --path={{ wp_path }} user update
+            {{ wp_admin_user | default(admin_user) }}
+            --user_pass='{{ wp_admin_password }}'
+
       become: yes
       become_user: www-data
 
-    - name: Override the configured current port with the new to-be port
-      # This is the port that Apache will listen on for this site and therefore
-      # that Nginx will use as its proxy pass port for the site. Examine
-      # /etc/apache2/ports.conf and select a port that's not already in use.
-      ansible.builtin.set_fact:
-        wordpress_site_subdomain: "{{ to_be_subdomain }}"
-        wordpress_site_reverse_proxy_pass_port: "{{ to_be_port }}"
-
-    - name: Include the required handlers from the wordpress_apache role
-      ansible.builtin.include_role:
+    - ansible.builtin.import_role:
         name: wordpress_apache
-        tasks_from: none
-        handlers_from: "{{ handlers_from }}"    
+        tasks_from: create-site
 
-    - name: Import the tasks to create the site from the wordpress_apache role
-      # Note that included the required handlers with in the previous task and
-      # imported the required tasks in this task so that we could use
-      # --start-at-task for this imported task list if we wanted to.
-      ansible.builtin.import_role:
-        name: wordpress_apache
-        tasks_from: create-site-apache
-        handlers_from: none
-
-    - name: Include the required Nginx handlers
-      ansible.builtin.include_role:
-        name: nginx
-        tasks_from: none
-        handlers_from: service
-    
-    - name: Import the tasks to create the site from the reverse_proxy role
-      ansible.builtin.import_role:
+    - ansible.builtin.import_role:
         name: reverse_proxy
-        tasks_from: create-site-body
+        tasks_from: create-site
+      delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
