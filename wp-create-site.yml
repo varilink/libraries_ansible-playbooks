@@ -9,21 +9,26 @@
 
 ---
 
-- hosts: gateway
+- hosts: localhost
 
-  # Configure a Dynamic DNS record for the website, since it is hosted on the
-  # office network but exposed externally to customer users.  
+  vars_prompt:
+
+    - name: wp_host
+      prompt: Which WordPress host do you want to create a website on?
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: dynamic_dns
-        tasks_from: create-record
-      vars:
-        dns_record_hostname: "{{ wp_subdomain }}"
-      tags: dns
+    - ansible.builtin.add_host:
+        name: "{{ wp_host }}"
+        groups: wp_host
 
-- hosts: wordpress
+    - name: Set a fact containing the name of the selected wp_host
+      ansible.builtin.set_fact:
+        wp_host: "{{ wp_host }}"
+
+  tags: always
+
+- hosts: wordpress:&wp_host
 
   tasks:
 
@@ -32,14 +37,30 @@
         tasks_from: site-action-precursors
       tags: always
 
-    - ansible.builtin.import_role:
-        name: dns_api
-        tasks_from: create-or-update-address-records
-      delegate_to: gateway
-      when: "'external' in group_names"
+- hosts: gateway
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-address-records
+          when: "'external' in hostvars[wp_host].group_names"
+
+        - ansible.builtin.import_role:
+            name: dynamic_dns
+            tasks_from: create-record
+          when: hostvars.localhost.wp_host == 'gateway'
+
       vars:
         dns_record_hostname: "{{ wp_subdomain }}"
+        dns_record_inventory_host: "{{ hostvars.localhost.wp_host }}"
       tags: dns
+
+- hosts: wordpress:&wp_host
+
+  tasks:
 
     - ansible.builtin.import_role:
         name: database

@@ -10,7 +10,27 @@
 
 ---
 
-- hosts: wordpress
+- hosts: localhost
+
+  vars_prompt:
+
+    - name: wp_host
+      prompt: Which WordPress host do you want to delete a website from?
+      private: false
+
+  tasks:
+
+    - ansible.builtin.add_host:
+        name: "{{ wp_host }}"
+        groups: wp_host
+
+    - name: Set a fact containing the name of the selected wp_host
+      ansible.builtin.set_fact:
+        wp_host: "{{ wp_host }}"
+
+  tags: always
+
+- hosts: wordpress:&wp_host
 
   tasks:
 
@@ -54,31 +74,39 @@
       delegate_to: "{{ wp_database_host | default(inventory_hostname) }}"
       tags: database
 
+- hosts: gateway
+
+  tasks:
+
     - block:
 
-        - block:
-
-            - ansible.builtin.include_role:
-                name: dns_api
-                tasks_from: delete-address-record
-              loop: ['A', 'AAAA']
-              loop_var: dns_record_type
-
-          when: "'external' in group_names"
-
         - ansible.builtin.import_role:
-            name: dns
-            tasks_from: delete-record
-          delegate_to: hub
-          when: "'internal' in group_names and inventory_hostname != 'gateway'"
+            name: dns_api
+            tasks_from: delete-address-records
+          when: "'external' in hostvars[wp_host].group_names"
 
         - ansible.builtin.import_role:
             name: dynamic_dns
             tasks_from: delete-record
-          vars:
-            dns_record_type: A
-          when: inventory_hostname == 'gateway'
+          when: wp_host == 'gateway'
 
       vars:
-        dns_record_hostname: "{{ wp_subdomain }}"
+        wp_host: "{{ hostvars['localhost'].wp_host }}"
+        dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
+        dns_record_inventory_host: "{{ hostvars.localhost.wp_host }}"
+      tags: dns
+
+- hosts: hub
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+        tasks_from: delete-record
+      delegate_to: hub
+      when: "'internal' in wp_group_names and wp_host != 'gateway'"
+      vars:
+        wp_host: "{{ hostvars.localhost.wp_host }}"
+        wp_group_names: "{{ hostvars[wp_host].group_names }}"
+        dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
       tags: dns
