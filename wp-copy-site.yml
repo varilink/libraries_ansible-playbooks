@@ -26,6 +26,7 @@
     - ansible.builtin.add_host:
         name: "{{ from_host }}"
         groups: from_host
+      changed_when: false
 
     - name: Set a date string to use in dump file names
       ansible.builtin.set_fact:
@@ -39,52 +40,58 @@
           {% for n in range(7) %}{{ hexchars | random }}{% endfor %}"
       when: dump_hex_string is not defined
 
+  tags: always
+
 - hosts: wordpress:&from_host
 
   tasks:
 
     - block:
 
-        - name: >-
-            Prompt for the subdomain to copy from when there's more than one
-            subdomain configured for the from host
-          ansible.builtin.pause:
-            prompt: >-
-              What subdomain are we copying from (
-              {{-
-                (wp_sites.keys() | map('quote') | list)[:-1] | join(', ')
-              }}
-              or {{ (wp_sites.keys() | map('quote') | list)[-1] }})
-          register: subdomain_prompt
+        - block:
 
-        - name: Set wp_subdomain as selected subdomain
+            - name: >-
+                Prompt for the subdomain to copy from when there's more than one
+                subdomain configured for the from host
+              ansible.builtin.pause:
+                prompt: >-
+                  What subdomain are we copying from (
+                  {{-
+                    (wp_sites.keys() | map('quote') | list)[:-1] | join(', ')
+                  }}
+                  or {{ (wp_sites.keys() | map('quote') | list)[-1] }})
+              register: subdomain_prompt
+
+            - name: Set wp_subdomain as selected subdomain
+              ansible.builtin.set_fact:
+                wp_subdomain: "{{ subdomain_prompt.user_input }}"
+
+          when: wp_subdomain is not defined
+
+        - name: Report the subdomain that we are copying from
+          debug:
+            msg: Copying from subdomain {{ wp_subdomain }} on this host
+
+        - ansible.builtin.import_role:
+            name: wordpress
+            tasks_from: set-site-facts
+
+        - name: Set the db_dump_file and wp_files archive facts
           ansible.builtin.set_fact:
-            wp_subdomain: "{{ subdomain_prompt.user_input }}"
+            db_dump_file: "\
+              {{ wp_database_name }}-\
+              {{ dump_date_string |
+                default(hostvars['localhost']['dump_date_string']) }}-\
+              {{ dump_hex_string |
+                default(hostvars['localhost']['dump_hex_string']) }}.sql.gz"
+            wp_files_archive: "\
+              {{ wp_server_name }}-\
+              {{ dump_date_string |
+                default(hostvars['localhost']['dump_date_string']) }}-\
+              {{ dump_hex_string |
+                default(hostvars['localhost']['dump_hex_string']) }}.tgz"
 
-      when: wp_subdomain is not defined
-
-    - name: Report the subdomain that we are copying from
-      debug:
-        msg: Copying from subdomain {{ wp_subdomain }} on this host
-
-    - ansible.builtin.import_role:
-        name: wordpress
-        tasks_from: set-site-facts
-
-    - name: Set the db_dump_file and wp_files archive facts
-      ansible.builtin.set_fact:
-        db_dump_file: "\
-          {{ wp_database_name }}-\
-          {{ dump_date_string |
-            default(hostvars['localhost']['dump_date_string']) }}-\
-          {{ dump_hex_string |
-            default(hostvars['localhost']['dump_hex_string']) }}.sql.gz"
-        wp_files_archive: "\
-          {{ wp_server_name }}-\
-          {{ dump_date_string |
-            default(hostvars['localhost']['dump_date_string']) }}-\
-          {{ dump_hex_string |
-            default(hostvars['localhost']['dump_hex_string']) }}.tgz"
+      tags: always
 
     - block:
 
@@ -106,10 +113,7 @@
                 path: "/tmp/{{ dump_file }}"
                 state: absent
 
-
           become: yes
-
-      when: not lookup('ansible.builtin.fileglob', '/tmp/' ~ dump_file)
 
       vars:
         dump_file: "\
@@ -118,6 +122,10 @@
             default(hostvars['localhost']['dump_date_string']) }}-\
           {{ dump_hex_string |
             default(hostvars['localhost']['dump_hex_string']) }}.sql.gz"
+
+      when: not lookup('ansible.builtin.fileglob', '/tmp/' ~ dump_file)
+
+      tags: database
 
     - block:
 
@@ -142,8 +150,6 @@
             state: absent
           become: yes
 
-      when: not lookup('ansible.builtin.fileglob', '/tmp/' ~ dump_file)
-
       vars:
         dump_file: "\
           {{ wp_server_name }}-\
@@ -151,6 +157,10 @@
             default(hostvars['localhost']['dump_date_string']) }}-\
           {{ dump_hex_string |
             default(hostvars['localhost']['dump_hex_string']) }}.tgz"
+
+      when: not lookup('ansible.builtin.fileglob', '/tmp/' ~ dump_file)
+
+      tags: wordpress
 
 - hosts: localhost
   gather_facts: false
@@ -166,13 +176,11 @@
     - ansible.builtin.add_host:
         name: "{{ to_host }}"
         groups: to_host
+      changed_when: false
+
+  tags: always
 
 - hosts: wordpress:&to_host
-
-  vars:
-
-    db_dump_file: "{{ hostvars[from_host]['db_dump_file'] }}"
-    wp_files_archive: "{{ hostvars[from_host]['wp_files_archive'] }}"
 
   tasks:
 
@@ -194,6 +202,17 @@
 
       when: wp_subdomain is not defined
 
+    - name: >-
+        Validate that at either host or subdomain or both is different between
+        from and to selections
+      ansible.builtin.fail:
+        msg: >-
+          Either host or subdomain or both must differ between from and to
+          selections
+      when: >-
+        inventory_hostname == hostvars.localhost.from_host and
+        wp_subdomain == hostvars[from_host].wp_subdomain
+
     - name: Report the subdomain that we are copying to
       debug:
          msg: Copying to subdomain {{ wp_subdomain }} on this host
@@ -202,73 +221,111 @@
         name: wordpress
         tasks_from: set-site-facts
 
-    - name: Copy the database dump file to the to host
-      ansible.builtin.copy:
-        src: "/tmp/{{ db_dump_file }}"
-        dest: "/tmp/"
+  tags: always
+
+- hosts: hub
+
+  tasks:
 
     - ansible.builtin.import_role:
-        # This will use the dump file that was copied in the previous task.
-        name: database
-        tasks_from: import-site
-        handlers_from: none
+        name: dns
+        tasks_from: create-record
       vars:
-        dump_file: "{{ db_dump_file }}"
+        dns_record_hostname: "{{ hostvars[to_host].wp_subdomain }}"
+        dns_record_inventory_host: "{{ to_host }}"
+        dns_record_group: project
+      when: hostvars[to_host].wp_subdomain != hostvars[from_host].wp_subdomain
 
-    - ansible.builtin.import_role:
-        # The to instance's database already exists but this will have the
-        # effect of aligning the WordPress database use to what is configured
-        # for the to instance.
-        name: database
-        tasks_from: create-site
-        handlers_from: none
+  tags: dns
+
+- hosts: wordpress:&to_host
+
+  vars:
+
+    wp_files_archive: "{{ hostvars[from_host]['wp_files_archive'] }}"
+
+  tasks:
 
     - block:
 
-        - name: >-
-            Ensure that the top-level WordPress directory for the to instance
-            exists
-          ansible.builtin.file:
-            path: "/var/www/{{ wp_server_name }}/"
-            state: directory
+        - name: Copy the database dump file to the to host
+          ansible.builtin.copy:
+            src: "/tmp/{{ db_dump_file }}"
+            dest: "/tmp/"
 
-        - name: >-
-            Remove the html directory for the to instance so that any files
-            there that are not in the archive are deleted
-          ansible.builtin.file:
-            path: "/var/www/{{ wp_server_name }}/html"
-            state: absent
+        - ansible.builtin.import_role:
+            # This will use the dump file that was copied in the previous task.
+            name: database
+            tasks_from: import-site
+            handlers_from: none
+          vars:
+            dump_file: "{{ db_dump_file }}"
 
-        - name: Recreate the html directory for the to instance
-          ansible.builtin.file:
-            path: "/var/www/{{ wp_server_name }}/html/"
-            state: directory
-            owner: www-data
-            group: www-data
+        - ansible.builtin.import_role:
+            # The to instance's database already exists but this will have the
+            # effect of aligning the WordPress database use to what is configured
+            # for the to instance.
+            name: database
+            tasks_from: create-site
+            handlers_from: none
 
-        - name: Unarchive the WordPress site files on the to host
-          ansible.builtin.unarchive:
-            src: "/tmp/{{ wp_files_archive }}"
-            dest: "/var/www/{{ wp_server_name }}/html/"
+      vars:
 
-      become: yes
+        db_dump_file: "{{ hostvars[from_host]['db_dump_file'] }}"
 
-    - name: Set WordPress site plugin and theme facts to empty
-      # The site vars that we got in the task "Get site vars based on the
-      # current subdomain" above may have included configuration for site themes
-      # and plugins. We don't want to redeploy these when we import the
-      # WordPress tasks to create a site in the next task, since we've just
-      # copied over all the WordPress files. The easiest way to prevent this is
-      # simply to empty the facts that may contain that configuration.
-      ansible.builtin.set_fact:
-        wordpress_site_plugins: []
-        wordpress_site_themes: []
+      tags: database
 
-    - ansible.builtin.import_role:
-        # We do this solely to create the wp-config.php file from the site's
-        # configuration defined in the Ansible vars.
-        name: wordpress
-        tasks_from: create-site
+    - block:
+
+        - block:
+
+            - name: >-
+                Ensure that the top-level WordPress directory for the to
+                instance exists
+              ansible.builtin.file:
+                path: "/var/www/{{ wp_server_name }}/"
+                state: directory
+
+            - name: >-
+                Remove the html directory for the to instance so that any files
+                there that are not in the archive are deleted
+              ansible.builtin.file:
+                path: "/var/www/{{ wp_server_name }}/html"
+                state: absent
+
+            - name: Recreate the html directory for the to instance
+              ansible.builtin.file:
+                path: "/var/www/{{ wp_server_name }}/html/"
+                state: directory
+                owner: www-data
+                group: www-data
+
+            - name: Unarchive the WordPress site files on the to host
+              ansible.builtin.unarchive:
+                src: "/tmp/{{ wp_files_archive }}"
+                dest: "/var/www/{{ wp_server_name }}/html/"
+
+          become: yes
+
+        - name: Set WordPress site plugin and theme facts to empty
+          # The site vars that we got in the task "Get site vars based on the
+          # current subdomain" above may have included configuration for site
+          # themes and plugins. We don't want to redeploy these when we import
+          # the WordPress tasks to create a site in the next task, since we've
+          # just copied over all the WordPress files. The easiest way to prevent
+          # this is simply to empty the facts that may contain that
+          # configuration.
+          ansible.builtin.set_fact:
+            wordpress_site_plugins: []
+            wordpress_site_themes: []
+
+        - ansible.builtin.import_role:
+            # We do this solely to create the wp-config.php file from the site's
+            # configuration defined in the Ansible vars.
+            name: wordpress
+            tasks_from: create-site
+
+      tags: wordpress
 
     - block:
 
@@ -277,12 +334,21 @@
             to-be subdomain
           ansible.builtin.command: >-
             wp --path={{ wp_path }} search-replace
-            {{ hostvars[from_host]['wp_server_name'] }}
+            {{ hostvars[from_host].wp_server_name }}
             {{ wp_server_name }}
+          register: search_replace_result
+          when: wp_server_name != hostvars[from_host].wp_server_name
+
+        - debug:
+            var: search_replace_result
 
         - name: >-
             Reset the password for the admin user to that configured for this
             subdomain
+          # Note that this task will ALWAYS report a change even if the password
+          # that we change to is the same as what it was before. There's no way
+          # of preventing this as there's no way of knowing what the password
+          # was before the change.
           ansible.builtin.command: >-
             wp --path={{ wp_path }} user update
             {{ wp_admin_user | default(admin_user) }}
@@ -290,12 +356,29 @@
 
       become: yes
       become_user: www-data
+      tags: database
 
     - ansible.builtin.import_role:
         name: wordpress_apache
         tasks_from: create-site
+      tags: webserver
 
-    - ansible.builtin.import_role:
-        name: reverse_proxy
-        tasks_from: create-site
-      delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+    - block:
+
+        - ansible.builtin.import_role:
+            name: reverse_proxy
+            tasks_from: create-site
+          delegate_to: "\
+            {{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+          vars:
+            wp_uses_ca: no
+          when: wp_subdomain == hostvars[from_host].wp_subdomain
+
+        - ansible.builtin.import_role:
+            name: reverse_proxy
+            tasks_from: create-site
+          delegate_to: "\
+            {{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+          when: wp_subdomain != hostvars[from_host].wp_subdomain
+
+      tags: proxy
