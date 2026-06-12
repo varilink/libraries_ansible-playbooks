@@ -15,12 +15,14 @@
 
     - name: wp_host
       prompt: Which WordPress host do you want to create a website on?
+      private: false
 
   tasks:
 
     - ansible.builtin.add_host:
         name: "{{ wp_host }}"
         groups: wp_host
+      changed_when: false
 
     - name: Set a fact containing the name of the selected wp_host
       ansible.builtin.set_fact:
@@ -37,26 +39,41 @@
         tasks_from: site-action-precursors
       tags: always
 
-- hosts: gateway
+- name: Configure any required DNS records in our external DNS zone
+  hosts: gateway
+  tags: dns
+  vars:
+    wp_host: "{{ hostvars.localhost.wp_host }}"
+    dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
+    dns_record_inventory_host: "{{ wp_host }}"
 
   tasks:
 
-    - block:
+    - ansible.builtin.import_role:
+        name: dns_api
+        tasks_from: create-or-update-address-records
+      when: "'external' in hostvars[wp_host].group_names"
 
-        - ansible.builtin.import_role:
-            name: dns_api
-            tasks_from: create-or-update-address-records
-          when: "'external' in hostvars[wp_host].group_names"
+    - ansible.builtin.import_role:
+        name: dynamic_dns
+        tasks_from: create-record
+      when: hostvars.localhost.wp_host == 'gateway'
 
-        - ansible.builtin.import_role:
-            name: dynamic_dns
-            tasks_from: create-record
-          when: hostvars.localhost.wp_host == 'gateway'
+- name: Configure any required DNS records our internal DNS mask service
+  hosts: hub
+  tags: dns
+  vars:
+    wp_host: "{{ hostvars.localhost.wp_host }}"
+    dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
+    dns_record_inventory_host: "{{ wp_host }}"
+    dns_record_group: project
 
-      vars:
-        dns_record_hostname: "{{ wp_subdomain }}"
-        dns_record_inventory_host: "{{ hostvars.localhost.wp_host }}"
-      tags: dns
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+        tasks_from: create-record
+      when: "'internal' in hostvars[wp_host].group_names"
 
 - hosts: wordpress:&wp_host
 
@@ -90,18 +107,3 @@
       # be installed remote from the web and application layer on that host.
       delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
       tags: proxy
-
-- hosts: hub
-
-  tasks:
-
-    - ansible.builtin.import_role:
-        name: dns
-        tasks_from: create-record
-      vars:
-        dns_record_hostname: "{{ hostvars[dns_record_target].wp_server_name }}"
-        dns_record_target: "\
-          {{ groups['wordpress'] | intersect(ansible_limit) | first }}"
-        dns_record_type: project
-      when: "'internal' in group_names"
-      tags: dns
