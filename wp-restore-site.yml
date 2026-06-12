@@ -1,0 +1,145 @@
+# ------------------------------------------------------------------------------
+# wp-restore-site.yml
+# ------------------------------------------------------------------------------
+
+# Restore a WordPress site from a backup taken by our Bacula based backup
+# service. There are required precursors to running this playbook, see the
+# README for this repository.
+
+---
+
+- hosts: localhost
+
+  vars_prompt:
+
+    - name: wp_host
+      prompt: Which WordPress host are we restoring to?
+      private: false
+
+  tasks:
+
+    - name: Select the required WordPress host
+      ansible.builtin.add_host:
+        name: "{{ wp_host }}"
+        groups: wp_host
+      changed_when: false
+
+    - name: Set a fact for the wp_host variable
+      ansible.builtin.set_fact:
+        wp_host: "{{ wp_host }}"
+
+- hosts: wordpress:&wp_host
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: site-action-precursors
+
+    - name: Find matching database dump files in the backup
+      ansible.builtin.find:
+        paths: /tmp/bacula-restores/tmp/
+        patterns: "{{ wp_database_name }}-????-??-??-???????.sql"
+        recurse: no
+        file_type: file
+      register: matching_database_dump_files
+      become: yes
+
+    - name: Ensure exactly one file was found
+      ansible.builtin.assert:
+        that:
+          - matching_database_dump_files.matched == 1
+        fail_msg: >-
+          Expected exactly one file matching
+          {{ wp_database_name }}-????-??-??-???????\.sql in directory
+          /tmp/bacula-restores/tmp/ but found
+          {{ matching_database_dump_files.matched }}.
+
+    - ansible.builtin.import_role:
+        name: database
+        tasks_from: create-site
+        handlers_from: none
+
+    - ansible.builtin.import_role:
+        name: database
+        tasks_from: import-site
+        handlers_from: none
+      vars:
+        dump_file: "{{ matching_database_dump_files.files[0].path }}"
+
+    - block:
+
+        - name: Restore the WordPress site files from the backup
+          ansible.builtin.copy:
+            src: "/tmp/bacula-restores/var/www/{{ wp_server_name }}"
+            dest: "/var/www/"
+            remote_src: yes
+
+        - name: Reset ownership of HTML files for the WordPress site
+          ansible.builtin.file:
+            path: "/var/www/{{ wp_server_name }}/"
+            state: directory
+            owner: www-data
+            group: www-data
+            recurse: yes
+
+      become: yes
+
+- hosts: gateway
+
+  tasks:
+
+    - block:
+
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-address-records
+          when: "'external' in hostvars[wp_host].group_names"
+
+        - ansible.builtin.import_role:
+            name: dynamic_dns
+            tasks_from: create-record
+          when: hostvars.localhost.wp_host == 'gateway'
+
+      vars:
+        wp_host: "{{ hostvars.localhost.wp_host }}"
+        wp_subdomain: "{{ hostvars[wp_host].wp_subdomain }}"
+        dns_record_hostname: "{{ wp_subdomain }}"
+        dns_record_inventory_host: "{{ hostvars.localhost.wp_host }}"
+      tags: dns
+
+- hosts: hub
+
+  vars:
+
+    wp_host: "{{ hostvars.localhost.wp_host }}"
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+        tasks_from: create-record
+      vars:
+        dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
+        dns_record_inventory_host: "{{ wp_host }}"
+        dns_record_group: project
+      when: "'internal' in hostvars[wp_host].group_names"
+      tags: dns
+
+- hosts: wordpress:&wp_host
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: wordpress_apache
+        tasks_from: create-site
+      tags: webserver
+
+    - ansible.builtin.import_role:
+        name: reverse_proxy
+        tasks_from: create-site
+      # By default the reverse proxy is co-hosted with WordPress web and
+      # application layer. However, if wp_database_host is defined then it will
+      # be installed remote from the web and application layer on that host.
+      delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+      tags: proxy
