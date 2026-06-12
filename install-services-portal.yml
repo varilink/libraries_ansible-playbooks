@@ -120,5 +120,5 @@
         name: dns
         tasks_from: create-record
       vars:
-        dns_record_target: gateway
+        dns_record_inventory_host: gateway
         dns_record_hostname: portal.varilink.co.uk
