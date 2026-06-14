@@ -97,12 +97,17 @@
         name: wordpress
         tasks_from: set-site-facts
 
+    - ansible.builtin.import_role:
+        name: nginx
+        tasks_from: none    
+
     - block:
 
         - name: Copy the LetsEncrypt full chain
           ansible.builtin.copy:
             src: "/tmp/fullchain.pem"
             dest: "/etc/ssl/certs/{{ wp_server_name | replace('.', '_') }}.pem"
+          notify: Nginx configuration changed
 
         - name: Copy the LetsEncrypt private key
           ansible.builtin.copy:
@@ -110,6 +115,7 @@
             dest: "\
               /etc/ssl/private/{{ wp_server_name | replace('.', '_') }}.pem"
             mode: u=rw,g=,o=
+          notify: Nginx configuration changed
 
       become: yes
 
