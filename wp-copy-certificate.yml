@@ -43,7 +43,7 @@
         - name: Stat the fullchain
           stat:
             path: "\
-              /etc/letsencrypt/live/{{ wp_server_name }}-0001/fullchain.pem"
+              /etc/letsencrypt/live/{{ wp_server_name }}/fullchain.pem"
             follow: false
           register: fullchain_stat
 
@@ -56,7 +56,7 @@
         - name: Stat the privkey
           stat:
             path: "\
-              /etc/letsencrypt/live/{{ wp_server_name }}-0001/privkey.pem"
+              /etc/letsencrypt/live/{{ wp_server_name }}/privkey.pem"
             follow: false
           register: privkey_stat
 
