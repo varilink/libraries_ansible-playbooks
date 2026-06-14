@@ -52,33 +52,13 @@
 
     - block:
 
-        - block:
-
-            - name: >-
-                Prompt for the subdomain to copy from when there's more than one
-                subdomain configured for the from host
-              ansible.builtin.pause:
-                prompt: >-
-                  What subdomain are we copying from (
-                  {{-
-                    (wp_sites.keys() | map('quote') | list)[:-1] | join(', ')
-                  }}
-                  or {{ (wp_sites.keys() | map('quote') | list)[-1] }})
-              register: subdomain_prompt
-
-            - name: Set wp_subdomain as selected subdomain
-              ansible.builtin.set_fact:
-                wp_subdomain: "{{ subdomain_prompt.user_input }}"
-
-          when: wp_subdomain is not defined
+        - ansible.builtin.import_role:
+            name: wordpress
+            tasks_from: site-action-precursors
 
         - name: Report the subdomain that we are copying from
           debug:
             msg: Copying from subdomain {{ wp_subdomain }} on this host
-
-        - ansible.builtin.import_role:
-            name: wordpress
-            tasks_from: set-site-facts
 
         - name: Set the db_dump_file and wp_files archive facts
           ansible.builtin.set_fact:
@@ -192,23 +172,9 @@
 
   tasks:
 
-    - block:
-
-        - name: >-
-            Prompt for the subdomain to copy to when there's more than one
-            subdomain configured for the to host
-          ansible.builtin.pause:
-            prompt: >-
-              What subdomain are we copying from (
-              {{- (wp_sites.keys() | map('quote') | list)[:-1] | join(', ') }}
-              or {{ (wp_sites.keys() | map('quote') | list)[-1] }})
-          register: subdomain_prompt
-
-        - name: Set wp_subdomain as selected subdomain
-          ansible.builtin.set_fact:
-            wp_subdomain: "{{ subdomain_prompt.user_input }}"
-
-      when: wp_subdomain is not defined
+    - ansible.builtin.import_role:
+        name: wordpress
+        tasks_from: site-action-precursors
 
     - name: >-
         Validate that at either host or subdomain or both is different between
@@ -224,10 +190,6 @@
     - name: Report the subdomain that we are copying to
       debug:
          msg: Copying to subdomain {{ wp_subdomain }} on this host
-
-    - ansible.builtin.import_role:
-        name: wordpress
-        tasks_from: set-site-facts
 
   tags: always
 
