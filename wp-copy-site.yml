@@ -193,26 +193,43 @@
 
   tags: always
 
-- hosts: hub
+- name: Configure any required DNS records in our external DNS zone
+  hosts: gateway
+  vars:
+    from_host: "{{ hostvars.localhost.from_host }}"
+    from_wp_subdomain: "{{ hostvars[from_host].wp_subdomain }}"
+    to_host: "{{ hostvars.localhost.to_host }}"
+    to_wp_subdomain: "{{ hostvars[to_host].wp_subdomain }}"
+    dns_record_inventory_host: "{{ to_host }}"
+  tags: dns
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: dns
-        tasks_from: create-record
-      vars:
-        dns_record_hostname: "{{ hostvars[to_host].wp_subdomain }}"
-        dns_record_inventory_host: "{{ to_host }}"
-        dns_record_group: project
-      when: hostvars[to_host].wp_subdomain != hostvars[from_host].wp_subdomain
+    - block:
 
-  tags: dns
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-address-records
+          vars:
+            dns_record_hostname: "{{ to_wp_subdomain }}"
 
-- hosts: wordpress:&to_host
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-address-records
+          vars:
+            dns_record_hostname: ''
+          when: to_wp_subdomain == 'www'
 
+      when: >-
+        to_wp_subdomain != from_wp_subdomain and
+        'external' in hostvars[to_host].group_names
+
+- name: Create or refresh the to WordPress site
+  hosts: wordpress:&to_host
   vars:
-
-    wp_files_archive: "{{ hostvars[from_host]['wp_files_archive'] }}"
+    from_host: "{{ hostvars.localhost.from_host }}"
+    db_dump_file: "{{ hostvars[from_host].db_dump_file }}"
+    wp_files_archive: "{{ hostvars[from_host].wp_files_archive }}"
 
   tasks:
 
@@ -241,7 +258,7 @@
 
       vars:
 
-        db_dump_file: "{{ hostvars[from_host]['db_dump_file'] }}"
+        db_dump_file: "{{ hostvars[from_host].db_dump_file }}"
 
       tags: database
 
