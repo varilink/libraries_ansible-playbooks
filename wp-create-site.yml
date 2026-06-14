@@ -49,9 +49,19 @@
 
   tasks:
 
-    - ansible.builtin.import_role:
-        name: dns_api
-        tasks_from: create-or-update-address-records
+    - block:
+
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-address-records
+
+        - ansible.builtin.import_role:
+            name: dns_api
+            tasks_from: create-or-update-address-records
+          vars:
+            dns_record_hostname: ''
+          when: hostvars[wp_host].wp_subdomain == 'www'
+
       when: "'external' in hostvars[wp_host].group_names"
 
     - ansible.builtin.import_role:
@@ -59,21 +69,21 @@
         tasks_from: create-record
       when: hostvars.localhost.wp_host == 'gateway'
 
-- name: Configure any required DNS records our internal DNS mask service
+- name: >-
+    Delete any temporary DNS mask record that might have been put in place for
+    an external WordPress site during a copy operation
   hosts: hub
   tags: dns
   vars:
     wp_host: "{{ hostvars.localhost.wp_host }}"
-    dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
-    dns_record_inventory_host: "{{ wp_host }}"
-    dns_record_group: project
+    wp_server_name: "{{ hostvars[wp_host].wp_server_name }}"
 
   tasks:
 
     - ansible.builtin.import_role:
         name: dns
-        tasks_from: create-record
-      when: "'internal' in hostvars[wp_host].group_names"
+        tasks_from: delete-site.yml
+      when: "'external' in hostvars[wp_host].group_names"
 
 - hosts: wordpress:&wp_host
 
