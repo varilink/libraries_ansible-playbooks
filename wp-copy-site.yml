@@ -28,6 +28,10 @@
         groups: from_host
       changed_when: false
 
+    - name: Set a fact for the selected from_host
+      ansible.builtin.set_fact:
+        from_host: "{{ from_host }}"
+
     - name: Set a date string to use in dump file names
       ansible.builtin.set_fact:
         dump_date_string: "{{ ansible_facts['date_time']['date'] }}"
@@ -177,6 +181,10 @@
         name: "{{ to_host }}"
         groups: to_host
       changed_when: false
+
+    - name: Set a fact for the selected to_host
+      ansible.builtin.set_fact:
+        to_host: "{{ to_host }}"
 
   tags: always
 
