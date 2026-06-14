@@ -49,9 +49,11 @@ This primary contents of this repository are the playbooks in its root folder. A
 | [`stop-services.yml`](#stop-servicesyml)                                               | services |
 | [`wp-cli-run-command.yml`](#wp-cli-run-commandyml)                                     | project  |
 | [`wp-cli-run-script.yml`](#wp-cli-run-scriptyml)                                       | project  |
+| [`wp-copy-certificate.yml`](#wp-copy-certificateyml)                                   | project  |
 | [`wp-copy-site.yml`](#wp-copy-siteyml)                                                 | project  |
 | [`wp-create-site.yml`](#wp-create-siteyml)                                             | project  |
 | [`wp-delete-site.yml`](#wp-delete-siteyml)                                             | project  |
+| [`wp-deploy-dev-to-host.yml`](#wp-deploy-dev-to-hostyml)                               | project  |
 | [`wp-put-site-into-maintenance-mode.yml`](#wp-put-site-into-maintenance-modeyml)       | project  |
 | [`wp-restore-site.yml`](#wp-restore-siteyml)                                           | project  |
 | [`wp-take-site-out-of-maintenance-mode.yml`](#wp-take-site-out-of-maintenance-modeyml) | project  |
@@ -102,40 +104,6 @@ Bootstraps an office server, that is not a Cloud server nor based on a Raspberry
 
 Configures the email service for a project domain.
 
-### copy-certificate.yml
-
-*** OUT OF DATE ***<br>
-The usage instructions for this playbook are out of date, as is the function of the playbook itself.<br>
-*** OUT OF DATE ***
-
-This playbook copies the LetsEncrypt certificate for a FQDN - for example, `www.varilink.co.uk` - from one host to another host. This is useful because sometimes, if I am moving a website from one host to another host the process that I follow is:
-
-1. Setup the website on the new host.
-
-2. Modify the Varilink Computing Ltd office DNS service to direct requests to the website to the new host for testing purposes, while external to our office the website still resolves to the hold host.
-
-3. If all is well, update our external DNS service to resolve the website to the new host.
-
-At stage two, I can't use LetsEncrypt to install a certificate on the new host because it will fail the `HTTP-01` challenge, so we workaround this by copying the existing certificate across.
-
-When running this playbook, you must provide the `target_host` as via `--extra-vars`; for example:
-
-```sh
-ansible-playbook --extra-vars target_host=prod4 ./playbooks/copy-certificate.yml
-```
-
-The playbook will prompt for the `subdomain` to act upon. Alternatively you can also provide this via `--extra-vars`; for example:
-
-```sh
-ansible-playbook --extra-vars target_host=prod4 --extra-vars subdomain=www ./playbooks/copy-certificate.yml
-```
-
-The `domain_name` should be configured within the project's Ansible variable files. The playbook will look for the certificate to copy on every host within the `wordpress` inventory group with the exception of the `target_host`. You can of course limit the playbook's actions to only the required hosts, which are the `target_host`, the host that you know the certificate already exists on and the `localhost`; for example:
-
-```sh
-ansible-playbook --extra-vars target_host=prod4 --extra-vars subdomain=www --limit=prod3,prod4,localhost ./playbooks/copy-certificate.yml
-```
-
 ### install-services-portal.yml
 
 Installs a portal to securely expose information about office network hosted services externally.
@@ -183,6 +151,40 @@ ansible-playbook --limit=gateway --extra-vars wp_cli_script=init ./playbooks/run
 
 The `.sh` extension will be added to the name to determine the name of script file to look for. In the example above the script file `init.sh` will be searched for; first in the directory `wordpress/scripts`, which must be the path for project scripts, and then in the directory `wordpress/varilink-scripts`, which must be the path for shared scripts. The `wordpress/varilink-scripts` directory will only be searched if the script is not found in the `wordpress/scripts` directory.
 
+### wp-copy-certificate.yml
+
+*** OUT OF DATE ***<br>
+The usage instructions for this playbook are out of date, as is the function of the playbook itself.<br>
+*** OUT OF DATE ***
+
+This playbook copies the LetsEncrypt certificate for a FQDN - for example, `www.varilink.co.uk` - from one host to another host. This is useful because sometimes, if I am moving a website from one host to another host the process that I follow is:
+
+1. Setup the website on the new host.
+
+2. Modify the Varilink Computing Ltd office DNS service to direct requests to the website to the new host for testing purposes, while external to our office the website still resolves to the hold host.
+
+3. If all is well, update our external DNS service to resolve the website to the new host.
+
+At stage two, I can't use LetsEncrypt to install a certificate on the new host because it will fail the `HTTP-01` challenge, so we workaround this by copying the existing certificate across.
+
+When running this playbook, you must provide the `target_host` as via `--extra-vars`; for example:
+
+```sh
+ansible-playbook --extra-vars target_host=prod4 ./playbooks/copy-certificate.yml
+```
+
+The playbook will prompt for the `subdomain` to act upon. Alternatively you can also provide this via `--extra-vars`; for example:
+
+```sh
+ansible-playbook --extra-vars target_host=prod4 --extra-vars subdomain=www ./playbooks/copy-certificate.yml
+```
+
+The `domain_name` should be configured within the project's Ansible variable files. The playbook will look for the certificate to copy on every host within the `wordpress` inventory group with the exception of the `target_host`. You can of course limit the playbook's actions to only the required hosts, which are the `target_host`, the host that you know the certificate already exists on and the `localhost`; for example:
+
+```sh
+ansible-playbook --extra-vars target_host=prod4 --extra-vars subdomain=www --limit=prod3,prod4,localhost ./playbooks/copy-certificate.yml
+```
+
 ### wp-copy-site.yml
 
 This playbook takes a copy of one instance of the website for a domain (the copy "from instance") and restores it as another instance of the website for the same domain (the copy "to instance"). The to instance can be on a different host to the host for the from instance and/or for a different subdomain to the subdomain for the from instance.
@@ -209,6 +211,40 @@ The second step uses these two files to create or update the copy to website bas
 ansible-playbook --extra-vars from_host=prod4 --extra-vars to_host=prod5 --extra-vars dump_date_string=2026-06-05 --extra-vars dump_hex_string=08c83bf ./playbooks/wp-copy-site.yml
 ```
 
+#### Migration process
+
+This playbook is central to the process for migrating WordPress websites from one host to another host, which is often performed as part of the upgrade of our WordPress hosting environment. The steps to do this are as follows:
+
+1. Configure a WordPress site for the `to_host` of the copy operation using `inventory/host_vars` in the project's Ansible repository.
+
+2. Run this playbook to copy the WordPress site from the `to_host` to the `from_host`.
+
+    In a migration copy, the from and to subdomains for the WordPress site are the same. This causes this playbook to do two things that it doesn't do when those subdomains are different:
+
+    i. Configure a DNS record in the internal DNS mask service for the WordPress site, even if it is externally hosted.
+
+    ii. Generate a self-signed SSL certificate rather than obtain one from LetsEncrypt.
+
+    These actions are of course to allow for testing of the copied WordPress website on its new host prior to updating the relevant external DNS zone to point to that new host.
+
+3. Use a web browser to test the WordPress website on its new host accordingly.
+
+    Personally, I use the Chrome web browser and this means that I have to do the following in order to do this.
+
+    i. Go to `chrome://settings/security` in Chrome and disable the `Use secure DNS` option so that Chrome uses our DNS mask service for lookups. Use this in combination with `chrome://net-internals/#dns` to clear host resolver cache and do check lookups.
+
+    ii. When visiting the WordPress website on its new host, accept the security exception raised because the SSL certificate is self-signed and so can't be verified.
+
+    The second of these steps results in a "Not secure" alert in the Chrome address bar, which I like because it serves as a constant reminder that I am not yet seeing what external users are seeing until the migration process is complete. However, it does seem that to clear that alert after reverting to using a LetsEncrypt certificate again requires you to close all Chrome browser windows for the Google profile in question.
+
+4. When you have finished testing the WordPress website on its new host, put the current live instance on the host we're migrating from into maintenance mode using the `wp-put-site-into-maintenance-mode.yml` playbook to prevent any further updates to it.
+
+5. Run this playbook again to repeat the WorPress website copy.
+
+6. Run the `wp-create-site.yml` playbook for the WordPress website on its new host to put it live there.
+
+7. Run the `wp-delete-site.yml` playbook for the WordPress website on its old host and remove the configuration for it there in `inventory/host_vars/` in the project's Ansible repository to tidy up.
+
 ### wp-create-site.yml
 
 Creates a WordPress site.
@@ -217,13 +253,31 @@ Creates a WordPress site.
 
 Deletes a WordPress site.
 
+### wp-deploy-dev-to-host.yml
+
+Takes the backup of a WordPress website that been developed using a project's Docker Compose repository and deploys it to a host.
+
+### wp-deploy-dev-to-host.yml
+
+This playbook uses a backup of a WordPress site that's under development on the user desktop using a project's Docker Compose repository and deploys it to a website instance on a host.
+
 ### wp-put-into-maintenance-mode.yml
 
-Puts a WordPress site into maintenance mode.
+Puts a WordPress site into maintenance mode. It will prompt for the name of the host of the WordPress website and also that website's subdomain if there are more than one configured for the host.
+
+The playbook generates a random, complex token for bypassing the maintenance mode and reports its value. If you manually add a session cookie with the name `maintenance_bypass` and set it to that reported value, then you will be able to bypass maintenance mode to access the underlying website. Others who do not know this token's value will not be able to do that of course.
+
+Note that a WordPress site in maintenance mode as implemented by this playbook will give a HTTP 503 Service Unavailable response and so health monitors that take a HTTP 200 OK as an indicator of service health with raise alerts.
 
 ### wp-restore-site.yml
 
-Restores a WordPress site from backup.
+This playbook restores a WordPress site from a backup taken by our Bacula based backup services. Prior to running this playbook, it's necessary to do a Bacula restore. To do this run the `bconsole` command. At the `bconsole` command prompt, run `restore`.
+
+I find that the best approach is to then select option 5, *Select the most recent backup for a client* from the list of choices to select JobIds. Select the client that the backup was taken from and after `bconsole` has built the directory tree for the JobIds that collectively comprise the most recent backup for that client, mark the files to be restored.
+
+The files that you need to mark are the database SQL dump, which will be in the `/tmp` folder in the directory tree and the top-level folder for the website's WordPress files, which will be at `/var/www/[wp_server_name]/` in the directory tree.
+
+Note that the playbook relies on the WordPress site to be restored being configured in `inventory/host_vars/`.
 
 ### wp-take-wordpress-site-out-of-maintenance-mode.yml
 
