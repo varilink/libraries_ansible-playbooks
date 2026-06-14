@@ -1,7 +1,7 @@
 <?php
 if (
-    ! isset( $_COOKIE['PHPSESSID'] ) ||
-    $_COOKIE['PHPSESSID'] != '{{ phpsessid }}'
+    ! isset( $_COOKIE['maintenance_bypass'] ) ||
+    $_COOKIE['maintenance_bypass'] != '{{ maintenance_bypass_token }}'
 ) {
     $upgrading = time();
 }
