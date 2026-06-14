@@ -1,11 +1,48 @@
-- hosts: wordpress
+# ------------------------------------------------------------------------------
+# wp-put-site-into-maintenance-mode.yml
+# ------------------------------------------------------------------------------
+
+# Puts a WordPress website into maintenance mode.
+
+---
+
+- name: Prompt for the host of the WordPress site
+  hosts: localhost
 
   vars_prompt:
 
-    - name: phpsessid
-      prompt: Enter the PHPSESSID that should bypass maintenance mode
+    - name: wp_host
+      prompt: >-
+        What is the host of WordPress website that you want to put into
+        maintenance mode?
+      private: false
 
   tasks:
+
+    - ansible.builtin.add_host:
+        name: "{{ wp_host }}"
+        groups: wp_host
+      changed_when: false
+
+    - name: Set a fact containing the name of the selected wp_host
+      ansible.builtin.set_fact:
+        wp_host: "{{ wp_host }}"
+
+- name: Put the required WordPress website into maintenance mode
+  hosts: wordpress:&wp_host
+
+  tasks:
+
+    - name: Generate a maintenance mode bypass token
+      ansible.builtin.set_fact:
+        maintenance_bypass_token: >-
+          {{
+            lookup('password', '/dev/null chars=ascii_letters,digits length=32')
+          }}
+
+    - name: Report the value of the maintenance mode bypass token
+      debug:
+        var: maintenance_bypass_token
 
     - ansible.builtin.import_role:
         name: wordpress
@@ -13,11 +50,15 @@
 
     - block:
 
-        - ansible.builtin.template:
+        - name: Template the .maintenance file to the WordPress website
+          ansible.builtin.template:
             src: .maintenance
             dest: "{{ wp_path }}"
 
-        - ansible.builtin.template:
+        - name: >-
+            Template the wp-content/maintenance.php file to the WordPress
+            website
+          ansible.builtin.template:
             src: maintenance.php
             dest: "{{ wp_path }}/wp-content/"
 
