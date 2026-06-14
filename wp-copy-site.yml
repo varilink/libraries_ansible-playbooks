@@ -369,3 +369,25 @@
           when: wp_subdomain != hostvars[from_host].wp_subdomain
 
       tags: proxy
+
+- name: Put in place a temporary DNS mask record for testing if one is required
+  hosts: hub
+  vars:
+    from_host: "{{ hostvars.localhost.from_host }}"
+    from_wp_subdomain: "{{ hostvars[from_host].wp_subdomain }}"
+    to_host: "{{ hostvars.localhost.to_host }}"
+    to_wp_subdomain: "{{ hostvars[to_host].wp_subdomain }}"
+  tags: dns
+
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: dns
+        tasks_from: create-record
+      vars:
+        dns_record_hostname: "{{ to_wp_subdomain }}"
+        dns_record_inventory_host: "{{ to_host }}"
+        dns_record_group: project
+      when: >-
+        to_wp_subdomain == from_wp_subdomain and
+        'external' in hostvars[to_host].group_names
