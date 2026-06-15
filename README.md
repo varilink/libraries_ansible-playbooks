@@ -213,7 +213,7 @@ ansible-playbook --extra-vars from_host=prod4 --extra-vars to_host=prod5 --extra
 
 #### Migration process
 
-This playbook is central to the process for migrating WordPress websites from one host to another host, which is often performed as part of the upgrade of our WordPress hosting environment. The steps to do this are as follows:
+This playbook is central to the process for migrating WordPress websites from one host to another host, which is often performed as part of the upgrade of our WordPress hosting environment. A key feature of migration is that the from and to subdomains for the copy are the same. The steps to do this are as follows:
 
 1. Configure a WordPress site for the `to_host` of the copy operation using `inventory/host_vars` in the project's Ansible repository.
 
@@ -237,13 +237,38 @@ This playbook is central to the process for migrating WordPress websites from on
 
     The second of these steps results in a "Not secure" alert in the Chrome address bar, which I like because it serves as a constant reminder that I am not yet seeing what external users are seeing until the migration process is complete. However, it does seem that to clear that alert after reverting to using a LetsEncrypt certificate again requires you to close all Chrome browser windows for the Google profile in question.
 
+---
+
+You may pause at this point in the migration steps for as long as you like. This allows you to take as long as you like testing the website that has been created by the copy. It also means that you can execute the subsequent steps 4 to 8 by themselves within a subsequent implementation window; for example outside of office hours.
+
+---
+
 4. When you have finished testing the WordPress website on its new host, put the current live instance on the host we're migrating from into maintenance mode using the `wp-put-site-into-maintenance-mode.yml` playbook to prevent any further updates to it.
 
-5. Run this playbook again to repeat the WorPress website copy.
+    This also serves to be certain:
+    
+    i. When users are accessing the WordPress website on its new host, since then they will no longer see the maintenance mode page.
 
-6. Run the `wp-create-site.yml` playbook for the WordPress website on its new host to put it live there.
+    ii. When the DNS change made in step 7 below has propagated, at least as far as Germany. The HTTP 503 Service Unavailable response returned by the WordPress website in maintenance mode will result in us receiving a "service down" report from Uptime Robot's monitoring servers in Germany. After step 7 has been executed and the resulting DNS changes have propagated as far as their monitoring servers, they will report that the service is back up again, since they will then be monitoring the WordPress website on its new host.
 
-7. Run the `wp-delete-site.yml` playbook for the WordPress website on its old host and remove the configuration for it there in `inventory/host_vars/` in the project's Ansible repository to tidy up.
+5. Run this playbook again to repeat the WorPress website copy. This serves to ensure that no changes that have been made since you ran the WordPress website copy in step 2 are not lost.
+
+6. Run the `wp-copy-certificate.yml` playbook to replace the self-signed certificate that was created in step 2 with the LetsEncrypt certificate for the copied WordPress website taken from the host it was copied from. Note that does not yet configure `certbot` to be able to renew certificates for the WordPress website in its new location, see step 8. To check the details of the certificate that the website is now using use this command on the desktop:
+
+```sh
+openssl s_client -connect your-domain:443 -servername your-domain </dev/null 2>/dev/null |
+openssl x509 -noout -subject -issuer -enddate
+```
+
+7. Run the `wp-create-site.yml` playbook with the `--tag dns` option for the WordPress website. This will do two things:
+
+    i. Remove the temporary DNS mask from the office DNS server that was put in place to enable testing of the copy to WordPress website while the copy from WordPress website was still live.
+
+    ii. Update the DNS records for the WordPress website in the project's external DNZ zone to put into effect the switch over from copy from to copy to hosts.
+
+8. On receipt of service up notifications from Uptime Robot, which indicates that the DNS changes in the previous step have propagated (see step 4), run the `wp-create-site.yml` playbook again, this time with the `--tag proxy` option for the copy to host for the WordPress website. This will trigger `certbot` to create a certificate for the WordPress website there and in doing so also configure `certbot` to be able to renew the certificate when it comes up to expiry. You can use the command given in step 6 before and after this step to check the certificate details have been updated.
+
+9. Run the `wp-delete-site.yml` playbook for the WordPress website on its old host and remove the configuration for it there in `inventory/host_vars/` in the project's Ansible repository to tidy up.
 
 ### wp-create-site.yml
 
