@@ -44,8 +44,6 @@
   tags: dns
   vars:
     wp_host: "{{ hostvars.localhost.wp_host }}"
-    dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
-    dns_record_inventory_host: "{{ wp_host }}"
 
   tasks:
 
@@ -62,6 +60,9 @@
             dns_record_hostname: ''
           when: hostvars[wp_host].wp_subdomain == 'www'
 
+      vars:
+        dns_record_hostname: "{{ hostvars[wp_host].wp_subdomain }}"
+        dns_record_inventory_host: "{{ wp_host }}"
       when: "'external' in hostvars[wp_host].group_names"
 
     - ansible.builtin.import_role:
