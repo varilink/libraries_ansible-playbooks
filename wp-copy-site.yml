@@ -120,6 +120,8 @@
             dest: /tmp/{{ dump_file }}
             exclusion_patterns:
               - 'wp-config.php'
+              - '.maintenance'
+              - 'wp-content/maintenance.php'
           become: yes
 
         - name: Fetch the WordPress files dump that we've just created
