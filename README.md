@@ -233,9 +233,7 @@ This playbook is central to the process for migrating WordPress websites from on
 
     i. Go to `chrome://settings/security` in Chrome and disable the `Use secure DNS` option so that Chrome uses our DNS mask service for lookups. Use this in combination with `chrome://net-internals/#dns` to clear host resolver cache and do check lookups.
 
-    ii. When visiting the WordPress website on its new host, accept the security exception raised because the SSL certificate is self-signed and so can't be verified.
-
-    The second of these steps results in a "Not secure" alert in the Chrome address bar, which I like because it serves as a constant reminder that I am not yet seeing what external users are seeing until the migration process is complete. However, it does seem that to clear that alert after reverting to using a LetsEncrypt certificate again requires you to close all Chrome browser windows for the Google profile in question.
+    ii. When visiting the WordPress website on its new host, accept the security exception raised because the SSL certificate is self-signed and so can't be verified. Use the browser in Incognito mode so that your acceptance of this security exception is not remembered after you close the Incognito mode browser window.
 
 ---
 
@@ -260,15 +258,34 @@ openssl s_client -connect your-domain:443 -servername your-domain </dev/null 2>/
 openssl x509 -noout -subject -issuer -enddate
 ```
 
-7. Run the `wp-create-site.yml` playbook with the `--tag dns` option for the WordPress website. This will do two things:
+    You **could** do this at step 2 and not have to deal with an intermediate, self-signed certificate at all but as I said earlier, I personally like the fact that while I am working with a self-signed certificate it reminds me that I haven't yet haven't yet switched over the DNS record.
+
+7. **Immediately** after having run step 6, run the `wp-create-site.yml` playbook with the `--tag dns` option for the WordPress website. This will do two things:
 
     i. Remove the temporary DNS mask from the office DNS server that was put in place to enable testing of the copy to WordPress website while the copy from WordPress website was still live.
 
     ii. Update the DNS records for the WordPress website in the project's external DNZ zone to put into effect the switch over from copy from to copy to hosts.
 
+    I emphasise immediately above because once I've installed a LetsEncrypt certificate for the copied WordPress site, I am no longer reminded that I haven't yet switched over the DNS record by the browser security alert raised by the use of a self-signed certificate.
+
 8. On receipt of service up notifications from Uptime Robot, which indicates that the DNS changes in the previous step have propagated (see step 4), run the `wp-create-site.yml` playbook again, this time with the `--tag proxy` option for the copy to host for the WordPress website. This will trigger `certbot` to create a certificate for the WordPress website there and in doing so also configure `certbot` to be able to renew the certificate when it comes up to expiry. You can use the command given in step 6 before and after this step to check the certificate details have been updated.
 
 9. Run the `wp-delete-site.yml` playbook for the WordPress website on its old host and remove the configuration for it there in `inventory/host_vars/` in the project's Ansible repository to tidy up.
+
+#### Combined Migration and Redesign Scenario
+
+A recent implementation for one of my projects created a special scenario in which the migration of a website from one host to another host was combined with the implementation of a redesign. Here wsa the topology of website instances before and after the implementation.
+
+Before:
+- www.example.com on old host
+- redesign.example.com on new host
+
+After:
+- www.example.com on new host as a copy of redesign.example.com
+
+In order to achieve this it was necessary to do it in two steps as follows:
+1. Migrate www.example.com from the old host to the new host.
+2. Copy redesign.example.com to www.example.com on the new host.
 
 ### wp-create-site.yml
 
