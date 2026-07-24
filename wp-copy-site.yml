@@ -168,6 +168,18 @@
       ansible.builtin.set_fact:
         to_host: "{{ to_host }}"
 
+    - name: Copy wp_subdomain and wp_server_name facts to the localhost
+      ansible.builtin.set_fact:
+        from_wp_subdomain: "{{ hostvars[from_host].wp_subdomain }}"
+        from_wp_server_name: "{{ hostvars[from_host].wp_server_name }}"
+
+    - name: Unset wp_subdomain and wp_server_name facts on the from host
+      ansible.builtin.set_fact:
+        wp_subdomain: null
+        wp_server_name: null
+      delegate_to: "{{ from_host }}"
+      delegate_facts: true
+
   tags: always
 
 - hosts: wordpress:&to_host
@@ -187,7 +199,7 @@
           selections
       when: >-
         inventory_hostname == hostvars.localhost.from_host and
-        wp_subdomain == hostvars[from_host].wp_subdomain
+        wp_subdomain == hostvars.localhost.from_wp_subdomain
 
     - name: Report the subdomain that we are copying to
       debug:
@@ -199,7 +211,7 @@
   hosts: gateway
   vars:
     from_host: "{{ hostvars.localhost.from_host }}"
-    from_wp_subdomain: "{{ hostvars[from_host].wp_subdomain }}"
+    from_wp_subdomain: "{{ hostvars.localhost.from_wp_subdomain }}"
     to_host: "{{ hostvars.localhost.to_host }}"
     to_wp_subdomain: "{{ hostvars[to_host].wp_subdomain }}"
     dns_record_inventory_host: "{{ to_host }}"
@@ -323,10 +335,10 @@
             to-be subdomain
           ansible.builtin.command: >-
             wp --path={{ wp_path }} search-replace
-            {{ hostvars[from_host].wp_server_name }}
+            {{ hostvars.localhost.from_wp_server_name }}
             {{ wp_server_name }}
           register: search_replace_result
-          when: wp_server_name != hostvars[from_host].wp_server_name
+          when: wp_server_name != hostvars.localhost.from_wp_server_name
 
         - debug:
             var: search_replace_result
@@ -361,14 +373,14 @@
             {{ wp_reverse_proxy_host | default(inventory_hostname) }}"
           vars:
             wp_uses_ca: no
-          when: wp_subdomain == hostvars[from_host].wp_subdomain
+          when: wp_subdomain == hostvars.localhost.from_wp_subdomain
 
         - ansible.builtin.import_role:
             name: reverse_proxy
             tasks_from: create-site
           delegate_to: "\
             {{ wp_reverse_proxy_host | default(inventory_hostname) }}"
-          when: wp_subdomain != hostvars[from_host].wp_subdomain
+          when: wp_subdomain != hostvars.localhost.from_wp_subdomain
 
       tags: proxy
 
@@ -376,7 +388,7 @@
   hosts: hub
   vars:
     from_host: "{{ hostvars.localhost.from_host }}"
-    from_wp_subdomain: "{{ hostvars[from_host].wp_subdomain }}"
+    from_wp_subdomain: "{{ hostvars.localhost.from_wp_subdomain }}"
     to_host: "{{ hostvars.localhost.to_host }}"
     to_wp_subdomain: "{{ hostvars[to_host].wp_subdomain }}"
   tags: dns
