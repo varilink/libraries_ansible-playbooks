@@ -345,7 +345,7 @@
 
       tags: wordpress
 
-- hosts: wordpress:external
+- hosts: wordpress:&external
 
   # WordPress site hosts that are externally facing and therefore susceptible
   # to attacks from hackers.
