@@ -344,3 +344,40 @@
 #            name: dns_api
 
       tags: wordpress
+
+- hosts: wordpress:external
+
+  # WordPress site hosts that are externally facing and therefore susceptible
+  # to attacks from hackers.
+
+  tasks:
+
+    - name: >-
+        Set the ignoreip to an internal network mask when the WordPress host is
+        gateway
+      ansible.builtin.set_fact:
+        ignoreip: "{{ office_subnet }}"
+      when: inventory_hostname == 'gateway'
+
+    - block:
+
+        - name: Get the current externally facing IP address from ipify
+          ansible.builtin.uri:
+            url: "https://api.ipify.org?format=json"
+            method: GET
+            return_content: yes
+          register: ipify_response
+
+        - name: >-
+            Set the ignoreip to the current externally facing office IP address
+            when the WordPress host is not gateway
+          ansible.builtin.set_fact:
+            ignoreip: "{{ ipify_response.json.ip }}/32"
+
+      when: inventory_hostname != 'gateway'
+
+    - ansible.builtin.import_role:
+        name: nginx
+        tasks_from: fail2ban
+
+  tags: wordpress
