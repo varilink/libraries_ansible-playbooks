@@ -118,3 +118,13 @@
       # be installed remote from the web and application layer on that host.
       delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
       tags: proxy
+
+- hosts: wordpress:&external:&wp_host
+  tasks:
+
+    - ansible.builtin.import_role:
+        name: nginx
+        tasks_from: fail2ban-site
+      vars:
+
+  tags: proxy
