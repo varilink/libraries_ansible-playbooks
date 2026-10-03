@@ -345,7 +345,7 @@
 
       tags: wordpress
 
-- hosts: wordpress:&external
+- hosts: "wordpress:&external,gateway"
 
   # WordPress site hosts that are externally facing and therefore susceptible
   # to attacks from hackers.
@@ -380,4 +380,4 @@
         name: nginx
         tasks_from: fail2ban
 
-  tags: wordpress
+  tags: proxy
