@@ -327,23 +327,27 @@
 
   tasks:
 
-    - block:
+    - ansible.builtin.import_role:
+        name: database
+      tags:
+        - wordpress
+        - database
 
-        - ansible.builtin.import_role:
-            name: database
+    - ansible.builtin.import_role:
+        name: wordpress_apache
+      tags:
+        - wordpress
 
-        - ansible.builtin.import_role:
-            name: wordpress_apache
-
-        - ansible.builtin.import_role:
-            name: reverse_proxy
+    - ansible.builtin.import_role:
+        name: reverse_proxy
+      tags:
+        - wordpress
+        - proxy
 
 # Don't now follow the reasoning why the dns_api role would be needed on a
 # WordPress server. Investigate.
 #        - ansible.builtin.import_role:
 #            name: dns_api
-
-      tags: wordpress
 
 - hosts: "wordpress:&external,gateway"
 
