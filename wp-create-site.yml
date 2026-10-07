@@ -110,21 +110,20 @@
         tasks_from: create-site
       tags: webserver
 
-    - ansible.builtin.import_role:
-        name: reverse_proxy
-        tasks_from: create-site
-      # By default the reverse proxy is co-hosted with WordPress web and
-      # application layer. However, if wp_database_host is defined then it will
-      # be installed remote from the web and application layer on that host.
-      delegate_to: "{{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+    - block:
+
+        - ansible.builtin.import_role:
+            name: reverse_proxy
+            tasks_from: create-site
+          # By default the reverse proxy is co-hosted with WordPress web and
+          # application layer. However, if wp_database_host is defined then it
+          # will be installed remote from the web and application layer on that
+          # host.
+          delegate_to: "\
+            {{ wp_reverse_proxy_host | default(inventory_hostname) }}"
+
+        - ansible.builtin.import_role:
+            name: nginx
+            tasks_from: fail2ban-site
+
       tags: proxy
-
-- hosts: wordpress:&external:&wp_host
-  tasks:
-
-    - ansible.builtin.import_role:
-        name: nginx
-        tasks_from: fail2ban-site
-      vars:
-
-  tags: proxy
