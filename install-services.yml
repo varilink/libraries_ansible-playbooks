@@ -338,50 +338,94 @@
       tags:
         - wordpress
 
-    - ansible.builtin.import_role:
-        name: reverse_proxy
+    - block:
+
+        - ansible.builtin.import_role:
+            name: reverse_proxy
+
+        - block:
+
+            - name: Gather default IP addresses from external WordPress hosts
+              ansible.builtin.setup:
+                gather_subset:
+                  - 'default_ipv4'
+                  - 'default_ipv6'
+              delegate_to: "{{ item }}"
+              delegate_facts:
+              ignore_unreachable: true
+              when: >
+                hostvars[item].ansible_default_ipv4 is not defined or
+                hostvars[item].ansible_default_ipv6 is not defined
+              loop: "{{ groups['wordpress'] | intersect(groups['external']) }}"
+              register: remote_hosts_fact_gather
+
+            - name: Build list of IP addresses
+              ansible.builtin.set_fact:
+                gathered_ip_addresses: >-
+                  {{
+                    (
+                      remote_hosts_fact_gather.results
+                      | rejectattr('unreachable', 'defined')
+                      | selectattr(
+                          'ansible_facts.ansible_default_ipv4.address',
+                          'defined'
+                        )
+                      | map(
+                          attribute='ansible_facts.ansible_default_ipv4.address'
+                        )
+                      | list
+                    )
+                    +
+                    (
+                      remote_hosts_fact_gather.results
+                      | rejectattr('unreachable', 'defined')
+                      | selectattr(
+                          'ansible_facts.ansible_default_ipv6.address',
+                          'defined'
+                        )
+                      | map(
+                          attribute='ansible_facts.ansible_default_ipv6.address'
+                        )
+                      | list
+                    )
+                  }}
+
+            - name: >-
+                Set the IP addresses to ignore to gathered IP addresses + the
+                office subnet
+              ansible.builtin.set_fact:
+                ignoreip_addresses: "\
+                  {{ gathered_ip_addresses + [office_subnet] }}"
+              when: inventory_hostname == 'gateway'
+
+            - block:
+
+                - name: Get the current externally facing IP address from ipify
+                  ansible.builtin.uri:
+                    url: "https://api.ipify.org?format=json"
+                    method: GET
+                    return_content: yes
+                  delegate_to: gateway
+                  register: ipify_response
+
+                - name: >-
+                    Set the IP addresses to ignore to gathered IP addresses +
+                    the externally facing office IP address
+                  ansible.builtin.set_fact:
+                    ignoreip_addresses: "\
+                      {{ gathered_ip_addresses + [ipify_response.json.ip] }}"
+
+              when: inventory_hostname != 'gateway'
+
+            - ansible.builtin.import_role:
+                name: nginx
+                tasks_from: fail2ban
+
+          when: >-
+            inventory_hostname in groups['external'] or
+            inventory_hostname == 'gateway'
+
       tags:
         - wordpress
         - proxy
 
-# Don't now follow the reasoning why the dns_api role would be needed on a
-# WordPress server. Investigate.
-#        - ansible.builtin.import_role:
-#            name: dns_api
-
-- hosts: "wordpress:&external,gateway"
-
-  # WordPress site hosts that are externally facing and therefore susceptible
-  # to attacks from hackers.
-
-  tasks:
-
-    - name: >-
-        Set the ignoreip to an internal network mask when the WordPress host is
-        gateway
-      ansible.builtin.set_fact:
-        ignoreip: "{{ office_subnet }}"
-      when: inventory_hostname == 'gateway'
-
-    - block:
-
-        - name: Get the current externally facing IP address from ipify
-          ansible.builtin.uri:
-            url: "https://api.ipify.org?format=json"
-            method: GET
-            return_content: yes
-          register: ipify_response
-
-        - name: >-
-            Set the ignoreip to the current externally facing office IP address
-            when the WordPress host is not gateway
-          ansible.builtin.set_fact:
-            ignoreip: "{{ ipify_response.json.ip }}/32"
-
-      when: inventory_hostname != 'gateway'
-
-    - ansible.builtin.import_role:
-        name: nginx
-        tasks_from: fail2ban
-
-  tags: proxy
